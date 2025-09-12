@@ -11,7 +11,7 @@ const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuthStore();
   const { priorities } = useMagic10Store();
-  const { data: birthData } = useUserBirthData();
+  const { data: birthData } = useUserBirthData(user?.id?.toString() || '', !!user?.id);
   
   const [isEditing, setIsEditing] = useState(false);
   const [editingSection, setEditingSection] = useState<string | null>(null);
@@ -295,6 +295,21 @@ const ProfilePage: React.FC = () => {
           {editingSection === 'birth' ? (
             <BirthDataForm 
               initialData={birthData}
+              onSubmit={async (formData) => {
+                // Convert form data to API format
+                const birthDataPayload = {
+                  birth_date: `${formData.year}-${formData.month.padStart(2, '0')}-${formData.day.padStart(2, '0')}`,
+                  birth_time: `${formData.hours.padStart(2, '0')}:${formData.minutes.padStart(2, '0')}`,
+                  birth_location: formData.location,
+                  latitude: formData.coordinates?.lat,
+                  longitude: formData.coordinates?.lng
+                };
+                
+                const response = await apiClient.updateBirthData(birthDataPayload);
+                if (!response.success) {
+                  throw new Error(response.message || 'Failed to save birth data');
+                }
+              }}
               onSuccess={() => {
                 setEditingSection(null);
                 setMessage({ type: 'success', text: 'Birth data updated successfully!' });

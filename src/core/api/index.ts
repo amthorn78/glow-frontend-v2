@@ -180,7 +180,7 @@ class ApiClient {
   }
 
   async updateProfile(profileData: Partial<User>): Promise<ApiResponse<User>> {
-    return this.put<User>('/users/me', profileData);
+    return this.put<User>('/profile', profileData);
   }
 
   async getUserProfile(userId: string): Promise<ApiResponse<UserProfile>> {
