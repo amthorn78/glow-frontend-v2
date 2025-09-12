@@ -16,7 +16,7 @@ const LoginPage: React.FC = () => {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      navigate('/magic10-setup');
+      navigate('/dashboard');
     }
   }, [isAuthenticated, user, navigate]);
 
@@ -24,7 +24,7 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     loginMutation.mutate(formData, {
       onSuccess: () => {
-        navigate('/magic10-setup');
+        navigate('/dashboard');
       }
     });
   };

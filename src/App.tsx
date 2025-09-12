@@ -11,6 +11,7 @@ import { useAuthStore } from './stores/authStore';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import DashboardPage from './pages/DashboardPage';
 import Magic10SetupPage from './pages/Magic10SetupPage';
 import DiscoveryPage from './pages/DiscoveryPage';
 
@@ -47,6 +48,14 @@ const App: React.FC = () => {
               <Route path="/register" element={<RegisterPage />} />
               
               {/* Protected Routes */}
+              <Route 
+                path="/dashboard" 
+                element={
+                  <ProtectedRoute>
+                    <DashboardPage />
+                  </ProtectedRoute>
+                } 
+              />
               <Route 
                 path="/magic10-setup" 
                 element={
