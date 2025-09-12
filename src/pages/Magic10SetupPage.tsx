@@ -12,70 +12,70 @@ const MAGIC_10_DIMENSIONS = [
     label: 'Physical Attraction', 
     icon: '💕', 
     description: 'The spark of physical chemistry and romantic attraction',
-    explanation: 'How important is immediate physical chemistry and romantic spark in your connection? This includes attraction, chemistry, and that "butterflies" feeling.'
+    explanation: 'That flutter in your stomach, the magnetic pull, the way someone\'s smile makes your heart skip. Physical attraction is about the immediate chemistry that draws you to someone - not just looks, but that indefinable spark that makes you want to be close to them.'
   },
   { 
     key: 'emotionalConnection', 
     label: 'Emotional Connection', 
     icon: '💖', 
     description: 'Deep emotional understanding and vulnerability',
-    explanation: 'How much do you value emotional intimacy, sharing feelings, and being truly understood on a deep emotional level?'
+    explanation: 'The safety to be completely yourself, to share your fears and dreams without judgment. It\'s about finding someone who truly sees you, understands your emotional world, and creates space for both joy and tears. This is where souls meet.'
   },
   { 
     key: 'intellectualCompatibility', 
     label: 'Intellectual Compatibility', 
     icon: '🧠', 
     description: 'Mental stimulation and shared curiosity',
-    explanation: 'How important is it to have stimulating conversations, shared interests, and intellectual connection with your partner?'
+    explanation: 'Those conversations that make hours feel like minutes. The excitement of exploring ideas together, challenging each other\'s thinking, and discovering new perspectives. It\'s about finding someone whose mind dances with yours.'
   },
   { 
     key: 'spiritualAlignment', 
     label: 'Spiritual Alignment', 
     icon: '✨', 
     description: 'Shared values, beliefs, and life philosophy',
-    explanation: 'How much do you value having similar spiritual beliefs, life philosophy, or shared sense of meaning and purpose?'
+    explanation: 'The deeper questions of meaning, purpose, and what makes life worth living. Whether through religion, philosophy, or personal beliefs, this is about sharing a similar compass for navigating life\'s biggest questions and finding meaning together.'
   },
   { 
     key: 'communicationStyle', 
     label: 'Communication Style', 
     icon: '💬', 
     description: 'How you express and understand each other',
-    explanation: 'How important is it that you and your partner communicate in compatible ways - whether direct, gentle, humorous, or deep?'
+    explanation: 'The way you speak each other\'s language - whether that\'s through words, touch, actions, or silence. It\'s about feeling heard and understood, resolving conflicts with respect, and knowing you can talk through anything life brings.'
   },
   { 
     key: 'lifestyleCompatibility', 
     label: 'Lifestyle Compatibility', 
     icon: '🏠', 
     description: 'Daily routines, habits, and life preferences',
-    explanation: 'How much do you value having similar daily routines, social preferences, activity levels, and lifestyle choices?'
+    explanation: 'The rhythm of everyday life together. Do you both love quiet mornings or energetic starts? Social gatherings or intimate dinners? Adventure or routine? This is about how your daily lives can flow together harmoniously.'
   },
   { 
     key: 'valuesAlignment', 
     label: 'Values Alignment', 
     icon: '⚖️', 
     description: 'Core principles and what matters most',
-    explanation: 'How important is it to share fundamental values about family, career, money, ethics, and what you consider most important in life?'
+    explanation: 'The non-negotiables that guide your decisions - how you treat others, what you prioritize, what you stand for. When your core values align, you\'re building on the same foundation, making decisions that honor what you both hold sacred.'
   },
   { 
     key: 'humorCompatibility', 
     label: 'Humor Compatibility', 
     icon: '😄', 
     description: 'Shared laughter and playfulness',
-    explanation: 'How much do you value having a similar sense of humor, being able to laugh together, and bringing joy and playfulness to your connection?'
+    explanation: 'The ability to find joy together, to laugh until your sides hurt, to be silly and playful. Humor heals, connects, and lightens life\'s heavy moments. It\'s about finding someone who gets your jokes and makes you smile even on tough days.'
   },
   { 
     key: 'ambitionAlignment', 
     label: 'Ambition Alignment', 
     icon: '🎯', 
     description: 'Goals, drive, and future aspirations',
-    explanation: 'How important is it that you and your partner have compatible levels of ambition and similar goals for your future together?'
+    explanation: 'The dreams you\'re chasing and the energy you bring to pursuing them. This isn\'t about having identical goals, but about supporting each other\'s growth, understanding each other\'s drive, and building a future that honors both of your aspirations.'
   },
   { 
     key: 'familyOrientation', 
     label: 'Family Orientation', 
     icon: '👨‍👩‍👧‍👦', 
     description: 'Approach to family, children, and commitment',
-    explanation: 'How much do you value having similar views on family, children, marriage, and long-term commitment?'
+    explanation: 'How you envision building a life together - whether that includes children, how you relate to extended family, what commitment means to you. This is about creating a shared vision for the family you want to build or the partnership you want to nurture.'
   }
 ];
 
@@ -190,32 +190,32 @@ const Magic10SetupPageEnhanced: React.FC = () => {
               <h2 className="text-2xl font-bold text-gray-800 mb-4">
                 Welcome to Magic 10
               </h2>
-              <p className="text-gray-600 leading-relaxed">
-                Magic 10 is your personal compatibility compass. By ranking what matters most to you in a connection, 
-                we'll find matches who share your priorities and values.
+              <p className="text-gray-600 leading-relaxed mb-6">
+                Magic 10 simplifies Human Design compatibility into 10 easy dimensions you control. 
+                No complex readings - just a proven algorithm that finds your perfect matches based on what matters most to you.
               </p>
             </div>
 
             <div className="space-y-4 mb-8">
               <div className="flex items-start space-x-3">
-                <div className="text-2xl">💕</div>
-                <div>
-                  <h3 className="font-semibold text-gray-800">10 Key Dimensions</h3>
-                  <p className="text-sm text-gray-600">From physical attraction to family values</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
                 <div className="text-2xl">🎯</div>
                 <div>
-                  <h3 className="font-semibold text-gray-800">Your Unique Priorities</h3>
-                  <p className="text-sm text-gray-600">Rank what matters most to you</p>
+                  <h3 className="font-semibold text-gray-800">10 Simple Dimensions</h3>
+                  <p className="text-sm text-gray-600">Human Design compatibility made easy</p>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
-                <div className="text-2xl">✨</div>
+                <div className="text-2xl">🎮</div>
                 <div>
-                  <h3 className="font-semibold text-gray-800">Enhanced Matching</h3>
-                  <p className="text-sm text-gray-600">Combined with Human Design intelligence</p>
+                  <h3 className="font-semibold text-gray-800">You Control the Algorithm</h3>
+                  <p className="text-sm text-gray-600">Set your priorities, get better matches</p>
+                </div>
+              </div>
+              <div className="flex items-start space-x-3">
+                <div className="text-2xl">🚀</div>
+                <div>
+                  <h3 className="font-semibold text-gray-800">Proven Results</h3>
+                  <p className="text-sm text-gray-600">No complex readings, just smart matches</p>
                 </div>
               </div>
             </div>
@@ -317,9 +317,9 @@ const Magic10SetupPageEnhanced: React.FC = () => {
             </h2>
             <p className="text-gray-600 text-sm mb-4">{currentDimension.description}</p>
             
-            {/* Detailed Explanation */}
-            <div className="bg-gray-50 rounded-lg p-4 mb-6">
-              <p className="text-sm text-gray-700 leading-relaxed">
+            {/* Heartfelt Explanation */}
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4 mb-6 border border-purple-100">
+              <p className="text-sm text-gray-700 leading-relaxed italic">
                 {currentDimension.explanation}
               </p>
             </div>
