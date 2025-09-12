@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useMagic10Store } from '../stores/magic10Store';
-import Magic10DragRanking from '../components/Magic10DragRanking';
+import Magic10SimpleDisplay from '../components/Magic10SimpleDisplay';
 
 // Dashboard Components
 const UserWelcome: React.FC<{ user: any }> = ({ user }) => {
@@ -224,7 +224,7 @@ const DashboardPage: React.FC = () => {
         <QuickActions />
 
         {/* Magic 10 Priorities Display */}
-        <Magic10DragRanking />
+        <Magic10SimpleDisplay />
 
         {/* Onboarding Prompts */}
         {missingSteps.length > 0 && (

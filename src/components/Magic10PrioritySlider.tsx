@@ -118,10 +118,10 @@ export const Magic10Setup: React.FC<Magic10SetupProps> = ({
       {showTitle && (
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            ✨ Your Relationship Priorities
+            ✨ Your Connection Priorities
           </h1>
           <p className="text-gray-600 max-w-lg mx-auto">
-            Rate how important each aspect is to you in a relationship. 
+            Rate how important each aspect is to you in a connection. 
             This helps us find your most compatible matches.
           </p>
         </div>
