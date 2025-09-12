@@ -196,19 +196,19 @@ class ApiClient {
   // ============================================================================
 
   async getBirthData(): Promise<ApiResponse<BirthData>> {
-    return this.get<BirthData>('/users/me/birth-data');
+    return this.get<BirthData>('/profile/birth-data');
   }
 
   async saveBirthData(birthData: BirthDataForm): Promise<ApiResponse<BirthData>> {
-    return this.post<BirthData>('/users/me/birth-data', birthData);
+    return this.post<BirthData>('/birth-data', birthData);
   }
 
   async updateBirthData(birthData: Partial<BirthDataForm>): Promise<ApiResponse<BirthData>> {
-    return this.put<BirthData>('/users/me/birth-data', birthData);
+    return this.post<BirthData>('/profile/update-birth-data', birthData);
   }
 
   async deleteBirthData(): Promise<ApiResponse<void>> {
-    return this.delete<void>('/users/me/birth-data');
+    return this.delete<void>('/birth-data');
   }
 
   // ============================================================================
