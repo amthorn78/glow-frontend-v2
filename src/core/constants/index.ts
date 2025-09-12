@@ -7,7 +7,7 @@
 
 const API_CONFIG = {
   // Backend API base URL - will be configured via environment variables
-  BASE_URL: import.meta.env.VITE_API_BASE_URL || 'https://glow-backend-v4-production.up.railway.app',
+  BASE_URL: import.meta.env.VITE_API_BASE_URL || 'https://glow-backend-v4-production.up.railway.app/api',
   
   // API version
   VERSION: 'v1',
