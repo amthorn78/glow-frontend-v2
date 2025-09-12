@@ -101,11 +101,11 @@ const Magic10SimpleDisplay: React.FC = () => {
       {/* Summary */}
       <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4">
         <div className="flex items-center space-x-2">
-          <div className="text-lg">✨</div>
+          <div className="text-lg">⚖️</div>
           <div>
-            <p className="text-sm font-medium text-purple-700">Your top 3 priorities get the highest compatibility scores</p>
+            <p className="text-sm font-medium text-purple-700">Your top priorities control who you see and who sees you</p>
             <p className="text-xs text-purple-600">
-              Enhanced with Human Design intelligence for better matches
+              Higher weights = better visibility in the matching algorithm
             </p>
           </div>
         </div>

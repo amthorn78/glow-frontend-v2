@@ -191,31 +191,31 @@ const Magic10SetupPageEnhanced: React.FC = () => {
                 Welcome to Magic 10
               </h2>
               <p className="text-gray-600 leading-relaxed mb-6">
-                Magic 10 simplifies Human Design compatibility into 10 easy dimensions you control. 
-                No complex readings - just a proven algorithm that finds your perfect matches based on what matters most to you.
+                Magic 10 controls who you see and who sees you. Set your priorities to weight the matching algorithm - 
+                higher priorities mean you'll see more people who value the same things, and they'll see more of you too.
               </p>
             </div>
 
             <div className="space-y-4 mb-8">
               <div className="flex items-start space-x-3">
+                <div className="text-2xl">⚖️</div>
+                <div>
+                  <h3 className="font-semibold text-gray-800">Weight the Algorithm</h3>
+                  <p className="text-sm text-gray-600">Your priorities control who you see and who sees you</p>
+                </div>
+              </div>
+              <div className="flex items-start space-x-3">
                 <div className="text-2xl">🎯</div>
                 <div>
-                  <h3 className="font-semibold text-gray-800">10 Simple Dimensions</h3>
-                  <p className="text-sm text-gray-600">Human Design compatibility made easy</p>
+                  <h3 className="font-semibold text-gray-800">Bidirectional Matching</h3>
+                  <p className="text-sm text-gray-600">High priorities = higher visibility both ways</p>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
-                <div className="text-2xl">🎮</div>
+                <div className="text-2xl">✨</div>
                 <div>
-                  <h3 className="font-semibold text-gray-800">You Control the Algorithm</h3>
-                  <p className="text-sm text-gray-600">Set your priorities, get better matches</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <div className="text-2xl">🚀</div>
-                <div>
-                  <h3 className="font-semibold text-gray-800">Proven Results</h3>
-                  <p className="text-sm text-gray-600">No complex readings, just smart matches</p>
+                  <h3 className="font-semibold text-gray-800">Enhanced with Human Design</h3>
+                  <p className="text-sm text-gray-600">Your weights + HD intelligence = better matches</p>
                 </div>
               </div>
             </div>
