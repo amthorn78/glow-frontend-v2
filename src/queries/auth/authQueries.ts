@@ -285,12 +285,11 @@ const useUpdateBirthDataMutation = () => {
 
   return useMutation({
     mutationFn: async (birthData: any): Promise<User> => {
-      const userId = authStore.user?.id;
-      if (!userId) {
+      if (!authStore.user?.id) {
         throw new Error('User not authenticated');
       }
 
-      const response = await apiClient.updateBirthData(userId, birthData);
+      const response = await apiClient.updateBirthData(birthData);
       return response;
     },
 

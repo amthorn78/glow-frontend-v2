@@ -12,6 +12,8 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import BirthDataPage from './pages/BirthDataPage';
+import BirthDataComparisonPage from './pages/BirthDataComparisonPage';
+import EnhancedBirthDataPage from './pages/EnhancedBirthDataPage';
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
 import Magic10SetupPage from './pages/Magic10SetupPage';
@@ -49,6 +51,8 @@ const App: React.FC = () => {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/birth-data" element={<BirthDataPage />} />
+              <Route path="/birth-data-enhanced" element={<EnhancedBirthDataPage />} />
+              <Route path="/birth-data-comparison" element={<BirthDataComparisonPage />} />
               
               {/* Protected Routes */}
               <Route 
