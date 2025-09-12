@@ -296,13 +296,15 @@ const ProfilePage: React.FC = () => {
             <BirthDataForm 
               initialData={birthData}
               onSubmit={async (formData) => {
-                // Convert form data to API format
+                // Convert form data to API format - wrap in birth_data object
                 const birthDataPayload = {
-                  birth_date: `${formData.year}-${formData.month.padStart(2, '0')}-${formData.day.padStart(2, '0')}`,
-                  birth_time: `${formData.hours.padStart(2, '0')}:${formData.minutes.padStart(2, '0')}`,
-                  birth_location: formData.location,
-                  latitude: formData.coordinates?.lat,
-                  longitude: formData.coordinates?.lng
+                  birth_data: {
+                    birth_date: `${formData.year}-${formData.month.padStart(2, '0')}-${formData.day.padStart(2, '0')}`,
+                    birth_time: `${formData.hours.padStart(2, '0')}:${formData.minutes.padStart(2, '0')}`,
+                    birth_location: formData.location,
+                    latitude: formData.coordinates?.lat,
+                    longitude: formData.coordinates?.lng
+                  }
                 };
                 
                 const response = await apiClient.updateBirthData(birthDataPayload);
