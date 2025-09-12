@@ -62,7 +62,7 @@ const useLoginMutation = () => {
       invalidateQueries.auth();
       
       // Prefetch user profile data
-      queryClient.prefetchQuery({
+      getQueryClient().prefetchQuery({
         queryKey: queryKeys.profiles.profile(data.user.id),
         queryFn: () => apiClient.getUserProfile(data.user.id),
         staleTime: 5 * 60 * 1000, // 5 minutes
@@ -164,7 +164,7 @@ const useLogoutMutation = () => {
       authStore.logout();
 
       // Clear all cached data
-      queryClient.clear();
+      getQueryClient().clear();
 
       console.log('Logout successful');
     },
@@ -174,7 +174,7 @@ const useLogoutMutation = () => {
       
       // Force logout even on error
       authStore.logout();
-      queryClient.clear();
+      getQueryClient().clear();
     },
 
     onSettled: () => {
@@ -258,7 +258,7 @@ const useUpdateProfileMutation = () => {
       authStore.setUser(updatedUser);
 
       // Invalidate related queries
-      queryClient.invalidateQueries({ 
+      getQueryClient().invalidateQueries({ 
         queryKey: queryKeys.profiles.profile(updatedUser.id) 
       });
 
@@ -299,7 +299,7 @@ const useUpdateBirthDataMutation = () => {
       authStore.setUser(updatedUser);
 
       // Invalidate compatibility-related queries
-      queryClient.invalidateQueries({ 
+      getQueryClient().invalidateQueries({ 
         queryKey: queryKeys.matches.all 
       });
 
@@ -460,7 +460,7 @@ const useDeleteAccountMutation = () => {
     onSuccess: () => {
       // Clear all data and logout
       authStore.logout();
-      queryClient.clear();
+      getQueryClient().clear();
       
       console.log('Account deleted successfully');
     },
