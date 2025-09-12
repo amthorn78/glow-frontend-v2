@@ -36,7 +36,15 @@ const RegisterPage: React.FC = () => {
       return;
     }
 
-    const { confirmPassword, ...registrationData } = formData;
+    // Convert camelCase to snake_case for backend compatibility
+    const registrationData = {
+      email: formData.email,
+      password: formData.password,
+      first_name: formData.firstName,
+      last_name: formData.lastName,
+      date_of_birth: formData.dateOfBirth
+    };
+    
     registerMutation.mutate(registrationData);
   };
 
