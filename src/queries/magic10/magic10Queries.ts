@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from '../../core/api'
+import apiClient from '../../core/api'
 
 // ============================================================================
 // TYPES
@@ -67,7 +67,7 @@ export const useUserPriorities = () => {
   return useQuery({
     queryKey: ['magic10', 'priorities'],
     queryFn: async () => {
-      const response = await api.get('/api/priorities')
+      const response = await apiClient.get('/api/priorities')
       return response.data.priorities as Magic10Priorities
     },
     staleTime: 30 * 60 * 1000, // 30 minutes
@@ -82,7 +82,7 @@ export const useUpdatePriorities = () => {
   
   return useMutation({
     mutationFn: async (priorities: Partial<Magic10Priorities>) => {
-      const response = await api.put('/api/priorities', priorities)
+      const response = await apiClient.put('/api/priorities', priorities)
       return response.data.priorities as Magic10Priorities
     },
     onSuccess: (updatedPriorities) => {
@@ -112,7 +112,7 @@ export const useCalculateCompatibility = () => {
   
   return useMutation({
     mutationFn: async (targetUserId: number) => {
-      const response = await api.post('/api/compatibility/calculate', {
+      const response = await apiClient.post('/api/compatibility/calculate', {
         target_user_id: targetUserId
       })
       return response.data.compatibility as CompatibilityResult
@@ -134,7 +134,7 @@ export const useCompatibilityResult = (targetUserId: number) => {
   return useQuery({
     queryKey: ['compatibility', 'result', targetUserId],
     queryFn: async () => {
-      const response = await api.get(`/api/compatibility/${targetUserId}`)
+      const response = await apiClient.get(`/api/compatibility/${targetUserId}`)
       return response.data.compatibility as CompatibilityResult
     },
     enabled: !!targetUserId,
@@ -160,7 +160,7 @@ export const useMagic10Matches = (filters?: {
       if (filters?.min_score) params.append('min_score', filters.min_score.toString())
       if (filters?.limit) params.append('limit', filters.limit.toString())
       
-      const response = await api.get(`/api/matches?${params}`)
+      const response = await apiClient.get(`/api/matches?${params}`)
       return response.data.matches as MatchProfile[]
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
@@ -183,7 +183,7 @@ export const useDiscoveryFeed = (filters?: {
       if (filters?.age_max) params.append('age_max', filters.age_max.toString())
       if (filters?.min_compatibility) params.append('min_compatibility', filters.min_compatibility.toString())
       
-      const response = await api.get(`/api/discovery/feed?${params}`)
+      const response = await apiClient.get(`/api/discovery/feed?${params}`)
       return response.data.profiles as MatchProfile[]
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -202,7 +202,7 @@ export const useSwipeProfile = () => {
   
   return useMutation({
     mutationFn: async ({ userId, action }: { userId: number, action: 'like' | 'pass' }) => {
-      const response = await api.post('/api/swipe', {
+      const response = await apiClient.post('/api/swipe', {
         target_user_id: userId,
         action
       })
@@ -233,7 +233,7 @@ export const useMagic10Insights = () => {
   return useQuery({
     queryKey: ['magic10', 'insights'],
     queryFn: async () => {
-      const response = await api.get('/api/magic10/insights')
+      const response = await apiClient.get('/api/magic10/insights')
       return response.data.insights
     },
     staleTime: 60 * 60 * 1000, // 1 hour
@@ -247,7 +247,7 @@ export const useCompatibilityExplanation = (targetUserId: number) => {
   return useQuery({
     queryKey: ['compatibility', 'explanation', targetUserId],
     queryFn: async () => {
-      const response = await api.get(`/api/compatibility/${targetUserId}/explanation`)
+      const response = await apiClient.get(`/api/compatibility/${targetUserId}/explanation`)
       return response.data.explanation
     },
     enabled: !!targetUserId,

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CompatibilityDisplay } from '../components/CompatibilityDisplay';
 import { useMagic10Store } from '../stores/magic10Store';
-import { apiClient } from '../core/api';
+import apiClient from '../core/api';
 
 interface ProfileCard {
   id: string;

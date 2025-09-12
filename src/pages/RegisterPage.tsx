@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
-import { apiClient } from '../core/api';
+import apiClient from '../core/api';
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();

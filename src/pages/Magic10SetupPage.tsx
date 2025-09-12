@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Magic10PrioritySlider } from '../components/Magic10PrioritySlider';
+import Magic10Setup from '../components/Magic10PrioritySlider';
 import { useMagic10Store } from '../stores/magic10Store';
 import { useAuthStore } from '../stores/authStore';
-import { apiClient } from '../core/api';
+import apiClient from '../core/api';
 
 const MAGIC_10_DIMENSIONS = [
   { key: 'love', label: 'Love', icon: '💕', description: 'Romantic connection and passion' },
