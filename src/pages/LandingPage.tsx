@@ -1,3 +1,4 @@
+// GLOW Landing Page - Magic 10 + HD Dating Platform - Build fixes applied
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUIStore } from '../stores/uiStore';
