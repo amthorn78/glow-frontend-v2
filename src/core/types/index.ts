@@ -8,15 +8,15 @@
 export interface User {
   id: string;
   email: string;
-  username: string;
-  firstName: string;
-  lastName: string;
-  dateOfBirth: string;
-  profilePicture?: string;
-  isActive: boolean;
-  isAdmin: boolean;
-  createdAt: string;
-  updatedAt: string;
+  first_name?: string;
+  last_name?: string;
+  bio?: string;
+  age?: number;
+  status: string;
+  is_admin: boolean;
+  profile_completion?: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface AuthTokens {
@@ -33,10 +33,8 @@ export interface LoginCredentials {
 export interface RegisterData {
   email: string;
   password: string;
-  username: string;
-  firstName: string;
-  lastName: string;
-  dateOfBirth: string;
+  first_name: string;
+  last_name: string;
 }
 
 // ============================================================================
