@@ -1,437 +1,273 @@
-@import "tailwindcss";
-@import "tw-animate-css";
+/* GLOW Dating App - Clean Professional Design */
+@import './styles/improved-design.css';
 
-@custom-variant dark (&:is(.dark *));
-
-@theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-}
-
-:root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-}
-
-/* ============================================================================ */
-/* GLOW DATING APP - MOBILE-FIRST STYLES */
-/* Phase 1: CALCINATION - Pure Foundation Architecture */
-/* ============================================================================ */
-
-/* Safe Area Support for Mobile Devices */
-.safe-area-pt {
-  padding-top: env(safe-area-inset-top);
-}
-
-.safe-area-pb {
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-.safe-area-pl {
-  padding-left: env(safe-area-inset-left);
-}
-
-.safe-area-pr {
-  padding-right: env(safe-area-inset-right);
-}
-
-/* Touch Optimization */
-.touch-manipulation {
-  touch-action: manipulation;
-}
-
-/* Smooth Scrolling */
-html {
-  scroll-behavior: smooth;
-}
-
-/* Mobile-First Typography */
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  line-height: 1.6;
-}
-
-/* Mobile Viewport Fix */
+/* App-specific overrides */
 .App {
   min-height: 100vh;
-  min-height: -webkit-fill-available;
+  background-color: var(--gray-50);
 }
 
-/* Prevent Zoom on Input Focus (iOS) */
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="number"],
-input[type="tel"],
-input[type="url"],
-input[type="search"],
-textarea,
-select {
-  font-size: 16px; /* Prevents zoom on iOS */
+/* Remove the terrible pink gradients and fix navigation */
+.landing-hero {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 4rem 2rem;
+  text-align: center;
 }
 
-/* Custom Scrollbar for WebKit */
-::-webkit-scrollbar {
-  width: 4px;
+.auth-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background-color: var(--gray-50);
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  background: white;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  padding: 2rem;
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 2px;
+.discovery-container {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 1rem;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
+.profile-card {
+  background: white;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  margin-bottom: 2rem;
 }
 
-/* Dating App Specific Styles */
-.swipe-card {
-  touch-action: pan-y;
-  user-select: none;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
+.compatibility-badge {
+  background: var(--primary-600);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: 0.875rem;
 }
 
-/* Gradient Backgrounds */
-.gradient-pink-purple {
-  background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
+.action-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin-top: 2rem;
 }
 
-.gradient-pink-orange {
-  background: linear-gradient(135deg, #ec4899 0%, #f97316 100%);
+.action-button {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  transition: all 0.2s ease-in-out;
+  box-shadow: var(--shadow-md);
 }
 
-/* Animation Classes */
-.animate-heart-beat {
-  animation: heartBeat 1.5s ease-in-out infinite;
+.action-button:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
 }
 
-@keyframes heartBeat {
-  0% {
-    transform: scale(1);
-  }
-  14% {
-    transform: scale(1.1);
-  }
-  28% {
-    transform: scale(1);
-  }
-  42% {
-    transform: scale(1.1);
-  }
-  70% {
-    transform: scale(1);
-  }
+.action-button.pass {
+  background-color: var(--gray-200);
+  color: var(--gray-600);
 }
 
-.animate-swipe-left {
-  animation: swipeLeft 0.3s ease-out forwards;
+.action-button.like {
+  background-color: var(--primary-600);
+  color: white;
 }
 
-.animate-swipe-right {
-  animation: swipeRight 0.3s ease-out forwards;
+/* Magic 10 Setup Improvements */
+.magic10-setup {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 2rem;
 }
 
-@keyframes swipeLeft {
-  to {
-    transform: translateX(-100%) rotate(-30deg);
-    opacity: 0;
-  }
+.priority-slider {
+  margin-bottom: 2rem;
 }
 
-@keyframes swipeRight {
-  to {
-    transform: translateX(100%) rotate(30deg);
-    opacity: 0;
-  }
+.slider-container {
+  margin-top: 1rem;
 }
 
-/* Match Animation */
-.animate-match-celebration {
-  animation: matchCelebration 1s ease-out;
+.slider {
+  width: 100%;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--gray-200);
+  outline: none;
+  -webkit-appearance: none;
 }
 
-@keyframes matchCelebration {
-  0% {
-    transform: scale(0.8);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--primary-600);
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
 }
 
-/* Loading Spinner */
-.loading-spinner {
-  animation: spin 1s linear infinite;
+.slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--primary-600);
+  cursor: pointer;
+  border: none;
+  box-shadow: var(--shadow-md);
 }
 
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* Remove emoji spam and improve icons */
+.dimension-icon {
+  font-size: 1.5rem;
+  margin-right: 0.75rem;
 }
 
-/* Focus Styles for Accessibility */
-.focus-ring {
-  @apply focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2;
+/* Better form styling */
+.form-group {
+  margin-bottom: 1.5rem;
 }
 
-/* High Contrast Mode Support */
-@media (prefers-contrast: high) {
-  .text-gray-600 {
-    @apply text-gray-900;
+.form-label {
+  display: block;
+  font-weight: 500;
+  color: var(--gray-700);
+  margin-bottom: 0.5rem;
+}
+
+.form-input {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--gray-900);
+  background-color: white;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease-in-out;
+  min-height: 2.5rem;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 3px rgb(236 72 153 / 0.1);
+}
+
+.form-button {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  background-color: var(--primary-600);
+  color: white;
+  border: 1px solid var(--primary-600);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  min-height: 2.5rem;
+}
+
+.form-button:hover:not(:disabled) {
+  background-color: var(--primary-700);
+  border-color: var(--primary-700);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Navigation improvements */
+.page-header {
+  background: white;
+  border-bottom: 1px solid var(--gray-200);
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+.back-button {
+  background-color: transparent;
+  color: var(--gray-600);
+  border: none;
+  padding: 0.5rem;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+
+.back-button:hover {
+  background-color: var(--gray-100);
+  color: var(--gray-700);
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+  .auth-container {
+    padding: 1rem;
   }
   
-  .text-gray-500 {
-    @apply text-gray-800;
+  .auth-card {
+    padding: 1.5rem;
   }
   
-  .border-gray-200 {
-    @apply border-gray-400;
-  }
-}
-
-/* Reduced Motion Support */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-
-/* Dark Mode Adjustments */
-@media (prefers-color-scheme: dark) {
-  .bg-white {
-    @apply bg-gray-900;
+  .magic10-setup {
+    padding: 1rem;
   }
   
-  .text-gray-900 {
-    @apply text-gray-100;
-  }
-  
-  .text-gray-600 {
-    @apply text-gray-300;
-  }
-  
-  .border-gray-200 {
-    @apply border-gray-700;
+  .page-header {
+    padding: 1rem;
   }
 }
 
-/* Print Styles */
-@media print {
-  .no-print {
-    display: none !important;
-  }
+/* Clean up compatibility displays */
+.compatibility-breakdown {
+  background: var(--gray-50);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  margin-top: 1rem;
 }
 
-/* Mobile Landscape Orientation */
-@media screen and (orientation: landscape) and (max-height: 500px) {
-  .mobile-landscape-adjust {
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
-  }
+.compatibility-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--gray-200);
 }
 
-/* Large Screen Adjustments */
-@media (min-width: 768px) {
-  .App {
-    background: linear-gradient(135deg, #fdf2f8 0%, #faf5ff 100%);
-  }
-  
-  .max-w-md {
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    border-radius: 1rem;
-    overflow: hidden;
-  }
+.compatibility-item:last-child {
+  border-bottom: none;
 }
 
-/* PWA Specific Styles */
-@media (display-mode: standalone) {
-  .pwa-only {
-    display: block;
-  }
-  
-  .browser-only {
-    display: none;
-  }
-}
-
-/* Utility Classes */
-.text-shadow {
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.backdrop-blur-light {
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-.glass-effect {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-/* Dating App Color Palette */
-:root {
-  --glow-pink: #ec4899;
-  --glow-purple: #8b5cf6;
-  --glow-orange: #f97316;
-  --glow-red: #ef4444;
-  --glow-green: #10b981;
-  --glow-blue: #3b82f6;
-  --glow-yellow: #f59e0b;
-  --glow-gray: #6b7280;
-}
-
-/* Custom Pink Theme Override */
-.text-pink-600 {
-  color: var(--glow-pink);
-}
-
-.bg-pink-600 {
-  background-color: var(--glow-pink);
-}
-
-.border-pink-600 {
-  border-color: var(--glow-pink);
-}
-
-.hover\:bg-pink-700:hover {
-  background-color: #be185d;
-}
-
-.focus\:ring-pink-500:focus {
-  --tw-ring-color: var(--glow-pink);
+.compatibility-score {
+  font-weight: 600;
+  color: var(--primary-600);
 }
 
