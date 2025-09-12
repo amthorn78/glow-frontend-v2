@@ -2,7 +2,7 @@
 // Phase 2: DISSOLUTION - Server State Management
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { queryKeys, invalidateQueries } from '../../providers/QueryProvider';
+import { queryKeys, invalidateQueries, getQueryClient } from '../../providers/QueryProvider';
 import { useAuthStore } from '../../stores/authStore';
 import apiClient from '../../core/api';
 import type { 
