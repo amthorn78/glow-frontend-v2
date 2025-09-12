@@ -21,7 +21,7 @@ const RegisterPage: React.FC = () => {
     onSuccess: (response) => {
       setToken(response.access_token);
       setUser(response.user);
-      navigate('/magic10-setup');
+      navigate('/birth-data');
     },
     onError: (error) => {
       console.error('Registration failed:', error);
