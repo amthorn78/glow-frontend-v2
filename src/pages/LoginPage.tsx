@@ -1,33 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
-import apiClient from '../core/api';
+import { useLoginMutation } from '../queries/auth/authQueries';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { setUser, setToken } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
 
-  const loginMutation = useMutation({
-    mutationFn: (credentials: { email: string; password: string }) =>
-      apiClient.login(credentials),
-    onSuccess: (response) => {
-      setToken(response.access_token);
-      setUser(response.user);
+  const loginMutation = useLoginMutation();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && user) {
       navigate('/magic10-setup');
-    },
-    onError: (error) => {
-      console.error('Login failed:', error);
     }
-  });
+  }, [isAuthenticated, user, navigate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    loginMutation.mutate(formData);
+    loginMutation.mutate(formData, {
+      onSuccess: () => {
+        navigate('/magic10-setup');
+      }
+    });
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,7 +94,7 @@ const LoginPage: React.FC = () => {
           {loginMutation.isError && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-600 text-sm">
-                Login failed. Please check your credentials and try again.
+                {loginMutation.error?.message || 'Login failed. Please check your credentials and try again.'}
               </p>
             </div>
           )}
