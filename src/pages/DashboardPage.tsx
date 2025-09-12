@@ -67,9 +67,9 @@ const QuickActions: React.FC = () => {
     },
     {
       title: 'Profile',
-      description: 'Edit your profile',
+      description: 'Manage your profile',
       icon: '👤',
-      action: () => navigate('/profile/edit'),
+      action: () => navigate('/profile'),
       color: 'from-blue-500 to-cyan-500'
     },
     {
