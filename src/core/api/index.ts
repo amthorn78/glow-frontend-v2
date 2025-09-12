@@ -296,11 +296,17 @@ class ApiClient {
   // ============================================================================
 
   private getAccessToken(): string | null {
-    return localStorage.getItem(AUTH_CONFIG.ACCESS_TOKEN_KEY);
+    // Get token from auth store instead of localStorage
+    const authStore = (window as any).__ZUSTAND_STORE__?.getState?.() || 
+                     JSON.parse(localStorage.getItem('glow-auth-store') || '{}');
+    return authStore.state?.token || authStore.token || null;
   }
 
   private getRefreshToken(): string | null {
-    return localStorage.getItem(AUTH_CONFIG.REFRESH_TOKEN_KEY);
+    // Get refresh token from auth store instead of localStorage
+    const authStore = (window as any).__ZUSTAND_STORE__?.getState?.() || 
+                     JSON.parse(localStorage.getItem('glow-auth-store') || '{}');
+    return authStore.state?.refreshToken || authStore.refreshToken || null;
   }
 
   private setTokens(accessToken: string, refreshToken: string): void {
