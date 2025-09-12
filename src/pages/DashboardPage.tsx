@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useMagic10Store } from '../stores/magic10Store';
+import Magic10DragRanking from '../components/Magic10DragRanking';
 
 // Dashboard Components
 const UserWelcome: React.FC<{ user: any }> = ({ user }) => {
@@ -14,7 +15,7 @@ const UserWelcome: React.FC<{ user: any }> = ({ user }) => {
         {greeting}, {user?.firstName || 'there'}! ✨
       </h1>
       <p className="text-pink-100">
-        Welcome back to your relationship journey
+        Welcome back to your connection journey
       </p>
     </div>
   );
@@ -221,6 +222,9 @@ const DashboardPage: React.FC = () => {
 
         {/* Quick Actions */}
         <QuickActions />
+
+        {/* Magic 10 Priorities Display */}
+        <Magic10DragRanking />
 
         {/* Onboarding Prompts */}
         {missingSteps.length > 0 && (

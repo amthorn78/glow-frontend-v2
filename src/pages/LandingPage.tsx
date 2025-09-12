@@ -21,14 +21,14 @@ const LandingPage: React.FC = () => {
             Find your perfect match through Magic 10 compatibility
           </p>
           <p className="text-sm text-gray-600">
-            Revolutionary relationship intelligence powered by Human Design
+            Revolutionary connection intelligence powered by Human Design
           </p>
         </div>
 
         {/* Magic 10 Preview */}
         <div className="bg-white rounded-xl p-6 shadow-lg mb-8">
           <h3 className="text-lg font-semibold text-gray-800 mb-4">
-            🎯 Magic 10 Relationship Priorities
+            🎯 Magic 10 Connection Priorities
           </h3>
           <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
             <div>💕 Love</div>

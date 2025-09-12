@@ -69,7 +69,7 @@ const Magic10SetupPage: React.FC = () => {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-pink-600 mb-2">✨ Magic 10 Setup</h1>
-          <p className="text-gray-600">Set your relationship priorities for better matches</p>
+          <p className="text-gray-600">Set your connection priorities for better matches</p>
         </div>
 
         {/* Progress Bar */}
@@ -106,7 +106,7 @@ const Magic10SetupPage: React.FC = () => {
 
           <div className="mt-4 text-center">
             <p className="text-sm text-gray-500">
-              How important is {currentDimension.label.toLowerCase()} in your ideal relationship?
+              How important is {currentDimension.label.toLowerCase()} in your ideal connection?
             </p>
           </div>
         </div>
