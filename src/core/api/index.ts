@@ -154,18 +154,24 @@ class ApiClient {
   // ============================================================================
 
   async login(credentials: LoginCredentials): Promise<ApiResponse<{ user: User; token: string }>> {
-    const response = await this.post<{ id: number; email: string; token: string; message: string }>('/api/auth/login', credentials);
+    const response = await this.post<{ message: string; token: string; user: { id: number; email: string; created_at: string; updated_at: string; is_admin: boolean; status: string } }>('/api/auth/login', credentials);
     
     if (response.success && response.data) {
-      // Backend returns user fields directly: {id, email, token, message}
-      // Create user object from the direct fields
+      // Boundary validation: ensure nested user object exists
+      if (!response.data.user || typeof response.data.user.id !== 'number') {
+        console.error('Invalid login response structure:', Object.keys(response.data));
+        throw new Error('Invalid login response: missing user data');
+      }
+      
+      // Backend returns nested user object: {user: {id, email, ...}, token, message}
+      // Keep ID as number in state (no toString coercion)
       const user: User = {
-        id: response.data.id.toString(), // Convert number to string to match User type
-        email: response.data.email,
-        status: 'active', // Default status
-        is_admin: false, // Default admin status
-        created_at: new Date().toISOString(), // Default timestamp
-        updated_at: new Date().toISOString(), // Default timestamp
+        id: response.data.user.id.toString(), // Convert to string only for User type compatibility
+        email: response.data.user.email,
+        status: response.data.user.status,
+        is_admin: response.data.user.is_admin,
+        created_at: response.data.user.created_at,
+        updated_at: response.data.user.updated_at,
       };
       
       this.setTokens(response.data.token, ''); // No refresh token from backend
@@ -226,7 +232,7 @@ class ApiClient {
   // ============================================================================
 
   async getCurrentUser(): Promise<ApiResponse<User>> {
-    return this.get<User>('/users/me');
+    return this.get<User>('/api/auth/me');
   }
 
   async updateProfile(profileData: Partial<User>): Promise<ApiResponse<User>> {

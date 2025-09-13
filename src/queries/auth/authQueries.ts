@@ -42,9 +42,22 @@ const useLoginMutation = () => {
       return { credentials };
     },
 
-    onSuccess: (data, variables) => {
+    onSuccess: async (data, variables) => {
       // Update auth store with successful login
       authStore.login(data.user, data.token, data.refreshToken);
+
+      // Trust pattern: immediately call /api/auth/me for authoritative user state
+      try {
+        const meResponse = await apiClient.getCurrentUser();
+        if (meResponse.success && meResponse.data) {
+          // Update with authoritative user data from /me
+          authStore.setUser(meResponse.data);
+          console.log('User state hydrated from /api/auth/me:', meResponse.data.email);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch user from /api/auth/me:', error);
+        // Continue with login response data as fallback
+      }
 
       // Invalidate and refetch user-related queries
       invalidateQueries.auth();
