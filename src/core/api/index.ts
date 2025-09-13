@@ -199,6 +199,11 @@ class ApiClient {
     return this.get<BirthData>('/profile/birth-data');
   }
 
+  async getUserBirthData(userId: string): Promise<ApiResponse<BirthData>> {
+    // For now, just use the same endpoint since birth data is user-specific
+    return this.get<BirthData>('/profile/birth-data');
+  }
+
   async saveBirthData(birthData: BirthDataForm): Promise<ApiResponse<BirthData>> {
     return this.post<BirthData>('/birth-data', birthData);
   }
@@ -404,6 +409,7 @@ export const {
   
   // Birth Data
   getBirthData,
+  getUserBirthData,
   saveBirthData,
   updateBirthData,
   deleteBirthData,
