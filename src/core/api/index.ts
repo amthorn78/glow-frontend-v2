@@ -30,6 +30,7 @@ class ApiClient {
   private timeout: number;
   private maxRetries: number;
   private retryDelay: number;
+  private _logged = false;
 
   constructor() {
     this.baseURL = API_CONFIG.BASE_URL;
@@ -49,6 +50,13 @@ class ApiClient {
   ): Promise<ApiResponse<T>> {
     try {
       const url = `${this.baseURL}${endpoint}`;
+      
+      // 🔎 Log API configuration on first call
+      if (!this._logged && typeof window !== "undefined") {
+        this._logged = true;
+        console.log("[R10] API_BASE =", this.baseURL, " first-url:", url);
+      }
+      
       const token = this.getAccessToken();
 
       const config: RequestInit = {

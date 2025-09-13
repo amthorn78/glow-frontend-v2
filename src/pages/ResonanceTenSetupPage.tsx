@@ -15,6 +15,12 @@ import {
 type SetupPhase = 'loading' | 'welcome' | 'setup' | 'completion';
 
 const ResonanceTenSetupPage: React.FC = () => {
+  if (typeof window !== "undefined") {
+    // 🔎 runtime fingerprint
+    (window as any).__R10_PAGE__ = "ResonanceTenSetupPage@v1";
+    console.log("[R10] Page:", (window as any).__R10_PAGE__);
+  }
+
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [phase, setPhase] = useState<SetupPhase>('loading');
@@ -136,7 +142,7 @@ const ResonanceTenSetupPage: React.FC = () => {
 
   if (phase === 'loading' || configLoading || prefsLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center" data-page="ResonanceTenSetupPage@v1">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
           <p className="text-white text-lg">Loading Resonance Ten...</p>
