@@ -88,7 +88,23 @@ class ApiClient {
         }
       }
 
-      const data = await response.json();
+      // Defensive response handling - check content type before parsing JSON
+      const contentType = response.headers.get('content-type');
+      let data;
+      
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          data = await response.json();
+        } catch (jsonError) {
+          // If JSON parsing fails, get the raw text for debugging
+          const text = await response.text();
+          throw new Error(`Invalid JSON response: ${text.substring(0, 200)}...`);
+        }
+      } else {
+        // Non-JSON response (likely HTML error page)
+        const text = await response.text();
+        throw new Error(`API Error ${response.status}: Expected JSON but received ${contentType}. Response: ${text.substring(0, 200)}...`);
+      }
 
       if (!response.ok) {
         throw new Error(data.message || data.error || ERROR_MESSAGES.SERVER_ERROR);
@@ -138,7 +154,7 @@ class ApiClient {
   // ============================================================================
 
   async login(credentials: LoginCredentials): Promise<ApiResponse<{ user: User; token: string }>> {
-    const response = await this.post<{ user: User; token: string; message: string }>('/auth/login', credentials);
+    const response = await this.post<{ user: User; token: string; message: string }>('/api/auth/login', credentials);
     
     if (response.success && response.data) {
       // Backend sends "token", not "access_token", and no refresh_token
@@ -156,7 +172,7 @@ class ApiClient {
   }
 
   async register(userData: RegisterData): Promise<ApiResponse<{ user: User; access_token: string; refresh_token: string }>> {
-    const response = await this.post<{ user: User; access_token: string; refresh_token: string }>('/auth/register', userData);
+    const response = await this.post<{ user: User; access_token: string; refresh_token: string }>('/api/auth/register', userData);
     
     if (response.success && response.data) {
       this.setTokens(response.data.access_token, response.data.refresh_token);
@@ -168,7 +184,7 @@ class ApiClient {
 
   async logout(): Promise<ApiResponse<void>> {
     try {
-      await this.post('/auth/logout');
+      await this.post('/api/auth/logout');
     } finally {
       this.clearAuthData();
     }
@@ -180,7 +196,7 @@ class ApiClient {
       const refreshToken = this.getRefreshToken();
       if (!refreshToken) return false;
 
-      const response = await this.post<{ access_token: string; refresh_token: string }>('/auth/refresh', {
+      const response = await this.post<{ access_token: string; refresh_token: string }>('/api/auth/refresh', {
         refresh_token: refreshToken,
       });
 
