@@ -167,11 +167,9 @@ const StructuredBirthDataForm: React.FC<StructuredBirthDataFormProps> = ({
       }
     }
 
-    // Time validation (required unless unknown)
-    if (!formData.unknownTime) {
-      if (formData.hour === null) newErrors.hour = "Select an hour or mark time as unknown";
-      if (formData.minute === null) newErrors.minute = "Select a minute or mark time as unknown";
-    }
+    // Time validation (always required)
+    if (formData.hour === null) newErrors.hour = "Select an hour";
+    if (formData.minute === null) newErrors.minute = "Select a minute";
 
     // Location validation
     if (!formData.location.trim()) newErrors.location = "Enter your birth location";
@@ -219,7 +217,7 @@ const StructuredBirthDataForm: React.FC<StructuredBirthDataFormProps> = ({
   // Check if form is valid for submission
   const isFormValid = formData.year && formData.month && formData.day && 
     formData.location.trim() && formData.lat && formData.lng &&
-    (formData.unknownTime || (formData.hour !== null && formData.minute !== null));
+    formData.hour !== null && formData.minute !== null;
 
   return (
     <div className="bg-white rounded-xl p-6 shadow-lg">
@@ -248,6 +246,31 @@ const StructuredBirthDataForm: React.FC<StructuredBirthDataFormProps> = ({
             Birth Date <span className="text-red-500">*</span>
           </label>
           <div className="grid grid-cols-3 gap-3">
+            {/* Year */}
+            <div>
+              <select
+                value={formData.year || ''}
+                onChange={(e) => {
+                  const year = e.target.value ? parseInt(e.target.value) : null;
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    year,
+                    day: null // Reset day when year changes (for leap year handling)
+                  }));
+                  setErrors(prev => ({ ...prev, year: '', day: '' }));
+                }}
+                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-base ${
+                  errors.year ? 'border-red-500' : 'border-gray-300'
+                }`}
+              >
+                <option value="">Year</option>
+                {years.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+              {errors.year && <p className="text-red-500 text-xs mt-1">{errors.year}</p>}
+            </div>
+
             {/* Month */}
             <div>
               <select
@@ -261,9 +284,10 @@ const StructuredBirthDataForm: React.FC<StructuredBirthDataFormProps> = ({
                   }));
                   setErrors(prev => ({ ...prev, month: '', day: '' }));
                 }}
+                disabled={!formData.year}
                 className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-base ${
                   errors.month ? 'border-red-500' : 'border-gray-300'
-                }`}
+                } ${!formData.year ? 'bg-gray-100 cursor-not-allowed' : ''}`}
               >
                 <option value="">Month</option>
                 {months.map(month => (
@@ -294,31 +318,6 @@ const StructuredBirthDataForm: React.FC<StructuredBirthDataFormProps> = ({
               </select>
               {errors.day && <p className="text-red-500 text-xs mt-1">{errors.day}</p>}
             </div>
-
-            {/* Year */}
-            <div>
-              <select
-                value={formData.year || ''}
-                onChange={(e) => {
-                  const year = e.target.value ? parseInt(e.target.value) : null;
-                  setFormData(prev => ({ 
-                    ...prev, 
-                    year,
-                    day: null // Reset day when year changes (for leap year handling)
-                  }));
-                  setErrors(prev => ({ ...prev, year: '', day: '' }));
-                }}
-                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-base ${
-                  errors.year ? 'border-red-500' : 'border-gray-300'
-                }`}
-              >
-                <option value="">Year</option>
-                {years.map(year => (
-                  <option key={year} value={year}>{year}</option>
-                ))}
-              </select>
-              {errors.year && <p className="text-red-500 text-xs mt-1">{errors.year}</p>}
-            </div>
           </div>
         </div>
 
@@ -328,77 +327,53 @@ const StructuredBirthDataForm: React.FC<StructuredBirthDataFormProps> = ({
             Birth Time <span className="text-red-500">*</span>
           </label>
           
-          {/* Unknown Time Checkbox */}
-          <div className="mb-3">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.unknownTime}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Hour */}
+            <div>
+              <select
+                value={formData.hour !== null ? formData.hour : ''}
                 onChange={(e) => {
-                  const unknownTime = e.target.checked;
-                  setFormData(prev => ({ 
-                    ...prev, 
-                    unknownTime,
-                    hour: unknownTime ? null : prev.hour,
-                    minute: unknownTime ? null : prev.minute
-                  }));
-                  setErrors(prev => ({ ...prev, hour: '', minute: '' }));
+                  const hour = e.target.value !== '' ? parseInt(e.target.value) : null;
+                  setFormData(prev => ({ ...prev, hour }));
+                  setErrors(prev => ({ ...prev, hour: '' }));
                 }}
-                className="mr-2 h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-              />
-              <span className="text-sm text-gray-600">I don't know my exact birth time</span>
-            </label>
-          </div>
-
-          {!formData.unknownTime && (
-            <div className="grid grid-cols-2 gap-3">
-              {/* Hour */}
-              <div>
-                <select
-                  value={formData.hour !== null ? formData.hour : ''}
-                  onChange={(e) => {
-                    const hour = e.target.value !== '' ? parseInt(e.target.value) : null;
-                    setFormData(prev => ({ ...prev, hour }));
-                    setErrors(prev => ({ ...prev, hour: '' }));
-                  }}
-                  className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-base ${
-                    errors.hour ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                >
-                  <option value="">Hour</option>
-                  {hours.map(hour => (
-                    <option key={hour} value={hour}>
-                      {hour.toString().padStart(2, '0')}:00 ({hour === 0 ? '12' : hour > 12 ? hour - 12 : hour} {hour < 12 ? 'AM' : 'PM'})
-                    </option>
-                  ))}
-                </select>
-                {errors.hour && <p className="text-red-500 text-xs mt-1">{errors.hour}</p>}
-              </div>
-
-              {/* Minute */}
-              <div>
-                <select
-                  value={formData.minute !== null ? formData.minute : ''}
-                  onChange={(e) => {
-                    const minute = e.target.value !== '' ? parseInt(e.target.value) : null;
-                    setFormData(prev => ({ ...prev, minute }));
-                    setErrors(prev => ({ ...prev, minute: '' }));
-                  }}
-                  className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-base ${
-                    errors.minute ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                >
-                  <option value="">Minute</option>
-                  {minutes.map(minute => (
-                    <option key={minute} value={minute}>
-                      :{minute.toString().padStart(2, '0')}
-                    </option>
-                  ))}
-                </select>
-                {errors.minute && <p className="text-red-500 text-xs mt-1">{errors.minute}</p>}
-              </div>
+                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-base ${
+                  errors.hour ? 'border-red-500' : 'border-gray-300'
+                }`}
+              >
+                <option value="">Hour</option>
+                {hours.map(hour => (
+                  <option key={hour} value={hour}>
+                    {hour.toString().padStart(2, '0')}:00 ({hour === 0 ? '12' : hour > 12 ? hour - 12 : hour} {hour < 12 ? 'AM' : 'PM'})
+                  </option>
+                ))}
+              </select>
+              {errors.hour && <p className="text-red-500 text-xs mt-1">{errors.hour}</p>}
             </div>
-          )}
+
+            {/* Minute */}
+            <div>
+              <select
+                value={formData.minute !== null ? formData.minute : ''}
+                onChange={(e) => {
+                  const minute = e.target.value !== '' ? parseInt(e.target.value) : null;
+                  setFormData(prev => ({ ...prev, minute }));
+                  setErrors(prev => ({ ...prev, minute: '' }));
+                }}
+                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-base ${
+                  errors.minute ? 'border-red-500' : 'border-gray-300'
+                }`}
+              >
+                <option value="">Minute</option>
+                {minutes.map(minute => (
+                  <option key={minute} value={minute}>
+                    :{minute.toString().padStart(2, '0')}
+                  </option>
+                ))}
+              </select>
+              {errors.minute && <p className="text-red-500 text-xs mt-1">{errors.minute}</p>}
+            </div>
+          </div>
         </div>
 
         {/* Birth Location */}
