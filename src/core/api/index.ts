@@ -1,6 +1,6 @@
-// Unified API Service for GLOW Dating App
+// API Client - Auth v2 Cookie-based
 // Phase 1: CALCINATION - Pure Foundation Architecture
-// Replaces the 3 conflicting data services with a single, unified service
+// Unified service with cookie-based authentication
 
 import { 
   ApiResponse, 
@@ -19,21 +19,19 @@ import {
   AdminStats,
   ReportedContent,
 } from '../types';
-import { API_CONFIG, AUTH_CONFIG, ERROR_MESSAGES } from '../constants';
+import { API_CONFIG, ERROR_MESSAGES } from '../constants';
 
 // ============================================================================
-// API CLIENT CLASS
+// API CLIENT CLASS - AUTH v2
 // ============================================================================
 
 class ApiClient {
-  private baseURL: string;
   private timeout: number;
   private maxRetries: number;
   private retryDelay: number;
   private _logged = false;
 
   constructor() {
-    this.baseURL = API_CONFIG.BASE_URL;
     this.timeout = API_CONFIG.TIMEOUT;
     this.maxRetries = API_CONFIG.MAX_RETRIES;
     this.retryDelay = API_CONFIG.RETRY_DELAY;
@@ -49,86 +47,134 @@ class ApiClient {
     retryCount = 0
   ): Promise<ApiResponse<T>> {
     try {
-      const url = `${this.baseURL}${endpoint}`;
+      // Ensure endpoint starts with /api/ for proper Vercel proxy routing
+      const url = endpoint.startsWith('/api/') ? endpoint : `/api${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
       
-      // 🔎 Log API configuration on first call
-      if (!this._logged && typeof window !== "undefined") {
-        this._logged = true;
-        console.log("[R10] API_BASE =", this.baseURL, " first-url:", url);
-      }
-      
-      const token = this.getAccessToken();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
-      const headers = new Headers(options.headers || {});
-      if (options.body) {
-        headers.set('Content-Type', 'application/json');
-      }
-      if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
-      }
+      const defaultHeaders: HeadersInit = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
 
       const config: RequestInit = {
         ...options,
-        headers,
-        signal: AbortSignal.timeout(this.timeout),
+        headers: {
+          ...defaultHeaders,
+          ...options.headers,
+        },
+        credentials: 'same-origin', // Include cookies for authentication
+        signal: controller.signal,
       };
 
-      const response = await fetch(url, config);
-      
-      // Handle token expiration
-      if (response.status === 401 && token) {
-        const refreshed = await this.refreshToken();
-        if (refreshed) {
-          // Retry with new token
-          return this.request(endpoint, options, retryCount);
-        } else {
-          // Refresh failed, redirect to login
-          this.handleAuthFailure();
-          throw new Error(ERROR_MESSAGES.TOKEN_EXPIRED);
-        }
+      if (!this._logged) {
+        console.log(`[TRACE] fetch → ${config.method || 'GET'} ${url}`);
+        this._logged = true;
       }
 
-      // Defensive response handling - check content type before parsing JSON
+      const response = await fetch(url, config);
+      clearTimeout(timeoutId);
+
+      // Check if response is JSON before parsing
       const contentType = response.headers.get('content-type');
-      let data;
-      
-      if (contentType && contentType.includes('application/json')) {
-        try {
-          data = await response.json();
-        } catch (jsonError) {
-          // If JSON parsing fails, get the raw text for debugging
-          const text = await response.text();
-          throw new Error(`Invalid JSON response: ${text.substring(0, 200)}...`);
-        }
-      } else {
-        // Non-JSON response (likely HTML error page)
+      const isJson = contentType && contentType.includes('application/json');
+
+      if (!isJson) {
+        // Handle non-JSON responses (HTML error pages, etc.)
         const text = await response.text();
-        throw new Error(`API Error ${response.status}: Expected JSON but received ${contentType}. Response: ${text.substring(0, 200)}...`);
+        const error = {
+          status: response.status,
+          statusText: response.statusText,
+          message: `Server returned ${response.status}: ${response.statusText}`,
+          details: text.substring(0, 200) + (text.length > 200 ? '...' : ''),
+        };
+        
+        console.error(`[API] Non-JSON response from ${url}:`, error);
+        
+        // Global 401 handler - redirect to login
+        if (response.status === 401) {
+          this.handleUnauthorized();
+        }
+        
+        throw new Error(error.message);
+      }
+
+      let data: any;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error(`[API] JSON parse error from ${url}:`, parseError);
+        throw new Error('Invalid JSON response from server');
+      }
+
+      console.log(`[TRACE] fetch ← ${response.status} ${url} {ct: ${contentType}, preview: ${JSON.stringify(data).substring(0, 100)}}`);
+
+      // Global 401 handler for JSON responses
+      if (response.status === 401) {
+        this.handleUnauthorized();
+        throw new Error(data.error || 'Authentication required');
       }
 
       if (!response.ok) {
-        throw new Error(data.message || data.error || ERROR_MESSAGES.SERVER_ERROR);
+        const error = new Error(data.error || data.message || `HTTP ${response.status}`);
+        (error as any).status = response.status;
+        (error as any).code = data.code;
+        throw error;
       }
 
-      // Return proper ApiResponse format
       return {
-        success: true,
-        data: data,
-        message: data.message || 'Success'
+        data,
+        status: response.status,
+        headers: response.headers,
+        ok: response.ok,
       };
-    } catch (error) {
-      // Retry logic for network errors
-      if (retryCount < this.maxRetries && this.isRetryableError(error)) {
-        await this.delay(this.retryDelay * Math.pow(2, retryCount));
-        return this.request(endpoint, options, retryCount + 1);
+
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw new Error(ERROR_MESSAGES.TIMEOUT);
       }
 
-      throw this.handleError(error);
+      // Retry logic for network errors (not 4xx/5xx)
+      if (retryCount < this.maxRetries && !error.status) {
+        await this.delay(this.retryDelay * Math.pow(2, retryCount));
+        return this.request<T>(endpoint, options, retryCount + 1);
+      }
+
+      throw error;
     }
   }
 
-  private async get<T>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: 'GET' });
+  // ============================================================================
+  // GLOBAL 401 HANDLER
+  // ============================================================================
+
+  private handleUnauthorized(): void {
+    // Clear any local auth state
+    if (typeof window !== 'undefined') {
+      // Broadcast logout to other tabs
+      try {
+        const channel = new BroadcastChannel('glow-auth');
+        channel.postMessage({ type: 'LOGOUT' });
+        channel.close();
+      } catch (e) {
+        console.warn('BroadcastChannel not available');
+      }
+
+      // Redirect to login with returnTo
+      const currentPath = window.location.pathname + window.location.search;
+      const returnTo = encodeURIComponent(currentPath);
+      window.location.href = `/login?returnTo=${returnTo}`;
+    }
+  }
+
+  // ============================================================================
+  // HTTP METHOD HELPERS
+  // ============================================================================
+
+  private async get<T>(endpoint: string, params?: Record<string, any>): Promise<ApiResponse<T>> {
+    const url = params ? `${endpoint}?${new URLSearchParams(params).toString()}` : endpoint;
+    return this.request<T>(url, { method: 'GET' });
   }
 
   private async post<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
@@ -145,375 +191,167 @@ class ApiClient {
     });
   }
 
+  private async patch<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, {
+      method: 'PATCH',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  }
+
   private async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { method: 'DELETE' });
-  }
-
-  // ============================================================================
-  // AUTHENTICATION METHODS
-  // ============================================================================
-
-  async login(credentials: LoginCredentials): Promise<ApiResponse<{ user: User; token: string }>> {
-    const response = await this.post<{ message: string; token: string; user: { id: number; email: string; created_at: string; updated_at: string; is_admin: boolean; status: string } }>('/api/auth/login', credentials);
-    
-    if (response.success && response.data) {
-      // Boundary validation: ensure nested user object exists
-      if (!response.data.user || typeof response.data.user.id !== 'number') {
-        console.error('Invalid login response structure:', Object.keys(response.data));
-        throw new Error('Invalid login response: missing user data');
-      }
-      
-      // Backend returns nested user object: {user: {id, email, ...}, token, message}
-      // Keep ID as number in state (no toString coercion)
-      const user: User = {
-        id: response.data.user.id.toString(), // Convert to string only for User type compatibility
-        email: response.data.user.email,
-        status: response.data.user.status,
-        is_admin: response.data.user.is_admin,
-        created_at: response.data.user.created_at,
-        updated_at: response.data.user.updated_at,
-      };
-      
-      this.setTokens(response.data.token, ''); // No refresh token from backend
-      this.setUserData(user);
-      
-      return {
-        success: true,
-        data: { user: user, token: response.data.token },
-        message: response.message || 'Login successful'
-      };
-    }
-    
-    return response;
-  }
-
-  async register(userData: RegisterData): Promise<ApiResponse<{ user: User; access_token: string; refresh_token: string }>> {
-    const response = await this.post<{ user: User; access_token: string; refresh_token: string }>('/api/auth/register', userData);
-    
-    if (response.success && response.data) {
-      this.setTokens(response.data.access_token, response.data.refresh_token);
-      this.setUserData(response.data.user);
-    }
-    
-    return response;
-  }
-
-  async logout(): Promise<ApiResponse<void>> {
-    try {
-      await this.post('/api/auth/logout');
-    } finally {
-      this.clearAuthData();
-    }
-    return { success: true };
-  }
-
-  async refreshToken(): Promise<boolean> {
-    try {
-      const refreshToken = this.getRefreshToken();
-      if (!refreshToken) return false;
-
-      const response = await this.post<{ access_token: string; refresh_token: string }>('/api/auth/refresh', {
-        refresh_token: refreshToken,
-      });
-
-      if (response.success && response.data) {
-        this.setTokens(response.data.access_token, response.data.refresh_token);
-        return true;
-      }
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-    }
-    
-    return false;
-  }
-
-  // ============================================================================
-  // USER PROFILE METHODS
-  // ============================================================================
-
-  async getCurrentUser(): Promise<ApiResponse<User>> {
-    return this.get<User>('/api/auth/me');
-  }
-
-  async updateProfile(profileData: Partial<User>): Promise<ApiResponse<User>> {
-    return this.put<User>('/profile', profileData);
-  }
-
-  async getUserProfile(userId: string): Promise<ApiResponse<UserProfile>> {
-    return this.get<UserProfile>(`/users/${userId}/profile`);
-  }
-
-  async updateUserProfile(profileData: Partial<UserProfile>): Promise<ApiResponse<UserProfile>> {
-    return this.put<UserProfile>('/users/me/profile', profileData);
-  }
-
-  // ============================================================================
-  // BIRTH DATA METHODS
-  // ============================================================================
-
-  async getBirthData(): Promise<ApiResponse<BirthData>> {
-    return this.get<BirthData>('/profile/birth-data');
-  }
-
-  async getUserBirthData(userId: string): Promise<ApiResponse<BirthData>> {
-    // For now, just use the same endpoint since birth data is user-specific
-    return this.get<BirthData>('/profile/birth-data');
-  }
-
-  async saveBirthData(birthData: BirthDataForm): Promise<ApiResponse<BirthData>> {
-    return this.post<BirthData>('/birth-data', birthData);
-  }
-
-  async updateBirthData(birthData: any): Promise<ApiResponse<BirthData>> {
-    // Handle both structured format (new) and legacy format
-    if (typeof birthData === 'object' && 'year' in birthData) {
-      // New structured format - send directly
-      return this.post<BirthData>('/profile/update-birth-data', birthData);
-    } else {
-      // Legacy format - wrap in birth_data object
-      return this.post<BirthData>('/profile/update-birth-data', birthData);
-    }
-  }
-
-  async deleteBirthData(): Promise<ApiResponse<void>> {
-    return this.delete<void>('/birth-data');
-  }
-
-  // ============================================================================
-  // RESONANCE TEN METHODS
-  // ============================================================================
-
-  async getResonanceConfig(): Promise<ApiResponse<any>> {
-    return this.get<any>('/config/resonance');
-  }
-
-  async getResonancePrefs(): Promise<ApiResponse<any>> {
-    return this.get<any>('/me/resonance');
-  }
-
-  async updateResonancePrefs(prefs: any): Promise<ApiResponse<{ ok: boolean }>> {
-    return this.put<{ ok: boolean }>('/me/resonance', prefs);
-  }
-
-  // ============================================================================
-  // DISCOVERY & MATCHING METHODS
-  // ============================================================================
-
-  async getDiscoveryProfiles(limit = 10): Promise<ApiResponse<UserProfile[]>> {
-    return this.get<UserProfile[]>(`/discovery/profiles?limit=${limit}`);
-  }
-
-  async swipeUser(userId: string, action: 'like' | 'pass' | 'super_like'): Promise<ApiResponse<{ match?: Match }>> {
-    return this.post<{ match?: Match }>('/discovery/swipe', {
-      swiped_user_id: userId,
-      action,
-    });
-  }
-
-  async getMatches(page = 1, limit = 20): Promise<ApiResponse<PaginatedResponse<Match>>> {
-    return this.get<PaginatedResponse<Match>>(`/matches?page=${page}&limit=${limit}`);
-  }
-
-  async getCompatibilityScore(userId: string): Promise<ApiResponse<CompatibilityScore>> {
-    return this.get<CompatibilityScore>(`/compatibility/${userId}`);
-  }
-
-  // ============================================================================
-  // MESSAGING METHODS
-  // ============================================================================
-
-  async getConversations(page = 1, limit = 20): Promise<ApiResponse<PaginatedResponse<Conversation>>> {
-    return this.get<PaginatedResponse<Conversation>>(`/conversations?page=${page}&limit=${limit}`);
-  }
-
-  async getMessages(conversationId: string, page = 1, limit = 50): Promise<ApiResponse<PaginatedResponse<Message>>> {
-    return this.get<PaginatedResponse<Message>>(`/conversations/${conversationId}/messages?page=${page}&limit=${limit}`);
-  }
-
-  async sendMessage(conversationId: string, content: string): Promise<ApiResponse<Message>> {
-    return this.post<Message>(`/conversations/${conversationId}/messages`, {
-      content,
-    });
-  }
-
-  async markMessageAsRead(messageId: string): Promise<ApiResponse<void>> {
-    return this.put<void>(`/messages/${messageId}/read`);
-  }
-
-  // ============================================================================
-  // ADMIN METHODS
-  // ============================================================================
-
-  async getAdminStats(): Promise<ApiResponse<AdminStats>> {
-    return this.get<AdminStats>('/admin/stats');
-  }
-
-  async getReportedContent(page = 1, limit = 20): Promise<ApiResponse<PaginatedResponse<ReportedContent>>> {
-    return this.get<PaginatedResponse<ReportedContent>>(`/admin/reports?page=${page}&limit=${limit}`);
-  }
-
-  async moderateUser(userId: string, action: 'warn' | 'suspend' | 'ban'): Promise<ApiResponse<void>> {
-    return this.post<void>(`/admin/users/${userId}/moderate`, { action });
   }
 
   // ============================================================================
   // UTILITY METHODS
   // ============================================================================
 
-  async uploadPhoto(file: File): Promise<ApiResponse<{ url: string }>> {
-    const formData = new FormData();
-    formData.append('photo', file);
-
-    return this.request<{ url: string }>('/upload/photo', {
-      method: 'POST',
-      body: formData,
-      headers: {}, // Let browser set Content-Type for FormData
-    });
-  }
-
-  async searchLocation(query: string): Promise<ApiResponse<Array<{ name: string; lat: number; lon: number }>>> {
-    return this.get<Array<{ name: string; lat: number; lon: number }>>(`/location/search?q=${encodeURIComponent(query)}`);
-  }
-
-  // ============================================================================
-  // TOKEN MANAGEMENT
-  // ============================================================================
-
-  private getAccessToken(): string | null {
-    // Get token from auth store instead of localStorage
-    const authStore = (window as any).__ZUSTAND_STORE__?.getState?.() || 
-                     JSON.parse(localStorage.getItem('glow-auth-store') || '{}');
-    return authStore.state?.token || authStore.token || null;
-  }
-
-  private getRefreshToken(): string | null {
-    // Get refresh token from auth store instead of localStorage
-    const authStore = (window as any).__ZUSTAND_STORE__?.getState?.() || 
-                     JSON.parse(localStorage.getItem('glow-auth-store') || '{}');
-    return authStore.state?.refreshToken || authStore.refreshToken || null;
-  }
-
-  private setTokens(accessToken: string, refreshToken: string): void {
-    localStorage.setItem(AUTH_CONFIG.ACCESS_TOKEN_KEY, accessToken);
-    localStorage.setItem(AUTH_CONFIG.REFRESH_TOKEN_KEY, refreshToken);
-  }
-
-  private setUserData(user: User): void {
-    localStorage.setItem(AUTH_CONFIG.USER_DATA_KEY, JSON.stringify(user));
-  }
-
-  private clearAuthData(): void {
-    localStorage.removeItem(AUTH_CONFIG.ACCESS_TOKEN_KEY);
-    localStorage.removeItem(AUTH_CONFIG.REFRESH_TOKEN_KEY);
-    localStorage.removeItem(AUTH_CONFIG.USER_DATA_KEY);
-  }
-
-  private handleAuthFailure(): void {
-    this.clearAuthData();
-    // Redirect to login page
-    window.location.href = '/login';
-  }
-
-  // ============================================================================
-  // ERROR HANDLING
-  // ============================================================================
-
-  private isRetryableError(error: any): boolean {
-    return (
-      error.name === 'TypeError' || // Network errors
-      error.name === 'TimeoutError' ||
-      (error.status >= 500 && error.status < 600) // Server errors
-    );
-  }
-
-  private handleError(error: any): Error {
-    if (error.name === 'TimeoutError') {
-      return new Error(ERROR_MESSAGES.TIMEOUT_ERROR);
-    }
-    
-    if (error.name === 'TypeError') {
-      return new Error(ERROR_MESSAGES.NETWORK_ERROR);
-    }
-    
-    return error instanceof Error ? error : new Error(ERROR_MESSAGES.SOMETHING_WENT_WRONG);
-  }
-
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   // ============================================================================
-  // PUBLIC UTILITY METHODS
+  // AUTHENTICATION ENDPOINTS - AUTH v2
   // ============================================================================
 
-  isAuthenticated(): boolean {
-    return !!this.getAccessToken();
+  async login(credentials: LoginCredentials): Promise<ApiResponse<{ ok: boolean; user?: User; error?: string; code?: string }>> {
+    const response = await this.post<{ ok: boolean; user?: User; error?: string; code?: string }>('/api/auth/login', credentials);
+    return response;
   }
 
-  getCurrentUserData(): User | null {
-    const userData = localStorage.getItem(AUTH_CONFIG.USER_DATA_KEY);
-    return userData ? JSON.parse(userData) : null;
+  async register(data: RegisterData): Promise<ApiResponse<{ ok: boolean; user?: User; error?: string; code?: string }>> {
+    const response = await this.post<{ ok: boolean; user?: User; error?: string; code?: string }>('/api/auth/register', data);
+    return response;
+  }
+
+  async logout(): Promise<ApiResponse<{ ok: boolean }>> {
+    const response = await this.post<{ ok: boolean }>('/api/auth/logout');
+    return response;
+  }
+
+  async getCurrentUser(): Promise<ApiResponse<{ ok: boolean; user?: User; error?: string; code?: string }>> {
+    const response = await this.get<{ ok: boolean; user?: User; error?: string; code?: string }>('/api/auth/me');
+    return response;
+  }
+
+  // ============================================================================
+  // USER PROFILE ENDPOINTS
+  // ============================================================================
+
+  async updateProfile(updates: Partial<User>): Promise<ApiResponse<{ user: User }>> {
+    const response = await this.patch<{ user: User }>('/api/user/profile', updates);
+    return response;
+  }
+
+  async updateBirthData(birthData: BirthDataForm): Promise<ApiResponse<{ user: User }>> {
+    const response = await this.patch<{ user: User }>('/api/user/birth-data', birthData);
+    return response;
+  }
+
+  async changePassword(data: { currentPassword: string; newPassword: string }): Promise<ApiResponse<{ success: boolean }>> {
+    const response = await this.post<{ success: boolean }>('/api/user/change-password', data);
+    return response;
+  }
+
+  async deleteAccount(data: { password: string }): Promise<ApiResponse<{ success: boolean }>> {
+    const response = await this.post<{ success: boolean }>('/api/user/delete-account', data);
+    return response;
+  }
+
+  // ============================================================================
+  // PASSWORD RESET ENDPOINTS
+  // ============================================================================
+
+  async forgotPassword(data: { email: string }): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    const response = await this.post<{ success: boolean; message: string }>('/api/auth/forgot-password', data);
+    return response;
+  }
+
+  async resetPassword(data: { token: string; newPassword: string }): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    const response = await this.post<{ success: boolean; message: string }>('/api/auth/reset-password', data);
+    return response;
+  }
+
+  // ============================================================================
+  // DISCOVERY & MATCHING ENDPOINTS
+  // ============================================================================
+
+  async getMatches(params?: { page?: number; limit?: number }): Promise<ApiResponse<PaginatedResponse<Match>>> {
+    const response = await this.get<PaginatedResponse<Match>>('/api/matches', params);
+    return response;
+  }
+
+  async swipe(data: SwipeAction): Promise<ApiResponse<{ match?: Match; compatibility?: CompatibilityScore }>> {
+    const response = await this.post<{ match?: Match; compatibility?: CompatibilityScore }>('/api/swipe', data);
+    return response;
+  }
+
+  async getCompatibilityScore(userId: string): Promise<ApiResponse<CompatibilityScore>> {
+    const response = await this.get<CompatibilityScore>(`/api/compatibility/${userId}`);
+    return response;
+  }
+
+  // ============================================================================
+  // MESSAGING ENDPOINTS
+  // ============================================================================
+
+  async getConversations(params?: { page?: number; limit?: number }): Promise<ApiResponse<PaginatedResponse<Conversation>>> {
+    const response = await this.get<PaginatedResponse<Conversation>>('/api/conversations', params);
+    return response;
+  }
+
+  async getMessages(conversationId: string, params?: { page?: number; limit?: number }): Promise<ApiResponse<PaginatedResponse<Message>>> {
+    const response = await this.get<PaginatedResponse<Message>>(`/api/conversations/${conversationId}/messages`, params);
+    return response;
+  }
+
+  async sendMessage(conversationId: string, data: { content: string }): Promise<ApiResponse<Message>> {
+    const response = await this.post<Message>(`/api/conversations/${conversationId}/messages`, data);
+    return response;
+  }
+
+  // ============================================================================
+  // RESONANCE TEN ENDPOINTS
+  // ============================================================================
+
+  async getResonanceConfig(): Promise<ApiResponse<any>> {
+    const response = await this.get<any>('/api/config/resonance');
+    return response;
+  }
+
+  // ============================================================================
+  // ADMIN ENDPOINTS
+  // ============================================================================
+
+  async getAdminStats(): Promise<ApiResponse<AdminStats>> {
+    const response = await this.get<AdminStats>('/api/admin/stats');
+    return response;
+  }
+
+  async getReportedContent(params?: { page?: number; limit?: number }): Promise<ApiResponse<PaginatedResponse<ReportedContent>>> {
+    const response = await this.get<PaginatedResponse<ReportedContent>>('/api/admin/reported-content', params);
+    return response;
+  }
+
+  async moderateContent(contentId: string, action: 'approve' | 'remove'): Promise<ApiResponse<{ success: boolean }>> {
+    const response = await this.post<{ success: boolean }>(`/api/admin/moderate/${contentId}`, { action });
+    return response;
+  }
+
+  // ============================================================================
+  // HEALTH CHECK
+  // ============================================================================
+
+  async healthCheck(): Promise<ApiResponse<{ status: string; timestamp: string }>> {
+    const response = await this.get<{ status: string; timestamp: string }>('/api/health');
+    return response;
   }
 }
 
 // ============================================================================
-// SINGLETON INSTANCE
+// SINGLETON EXPORT
 // ============================================================================
 
 export const apiClient = new ApiClient();
-
-// ============================================================================
-// CONVENIENCE EXPORTS
-// ============================================================================
-
-export const {
-  // Authentication
-  login,
-  register,
-  logout,
-  refreshToken,
-  
-  // User Profile
-  getCurrentUser,
-  updateProfile,
-  getUserProfile,
-  updateUserProfile,
-  
-  // Birth Data
-  getBirthData,
-  getUserBirthData,
-  saveBirthData,
-  updateBirthData,
-  deleteBirthData,
-  
-  // Resonance Ten
-  getResonanceConfig,
-  getResonancePrefs,
-  updateResonancePrefs,
-  
-  // Discovery & Matching
-  getDiscoveryProfiles,
-  swipeUser,
-  getMatches,
-  getCompatibilityScore,
-  
-  // Messaging
-  getConversations,
-  getMessages,
-  sendMessage,
-  markMessageAsRead,
-  
-  // Admin
-  getAdminStats,
-  getReportedContent,
-  moderateUser,
-  
-  // Utilities
-  uploadPhoto,
-  searchLocation,
-  isAuthenticated,
-  getCurrentUserData,
-} = apiClient;
-
 export default apiClient;
 

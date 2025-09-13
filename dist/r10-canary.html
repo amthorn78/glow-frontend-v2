@@ -1,0 +1,22 @@
+<!doctype html><meta charset="utf-8"/>
+<title>R10 Canary Test</title>
+<style>
+  body { font-family: monospace; padding: 20px; }
+  pre { background: #f5f5f5; padding: 10px; border-radius: 4px; }
+</style>
+<h1>Resonance Ten Canary Test</h1>
+<pre id="out">loading…</pre>
+<script>
+(async () => {
+  try {
+    const r = await fetch('/api/config/resonance', { credentials: 'include' });
+    const t = await r.text();
+    document.getElementById('out').textContent = r.status + ' ' + r.statusText + '\n' + t;
+    console.log('[CANARY]', r.status, r.statusText, t.slice(0, 500));
+  } catch (e) {
+    document.getElementById('out').textContent = 'ERR: ' + e;
+    console.error('[CANARY] ERR', e);
+  }
+})();
+</script>
+

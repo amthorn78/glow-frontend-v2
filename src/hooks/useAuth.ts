@@ -1,4 +1,4 @@
-// Enhanced Authentication Hook
+// Authentication Hook - Auth v2 Cookie-based
 // Phase 2: DISSOLUTION - Unified Auth Experience
 
 import { useCallback, useEffect } from 'react';
@@ -13,16 +13,15 @@ import {
   useForgotPasswordMutation,
   useResetPasswordMutation,
   useDeleteAccountMutation,
-  useTokenRefresh,
 } from '../queries/auth/authQueries';
 import type { LoginCredentials, RegisterData, User } from '../core/types';
 
 // ============================================================================
-// ENHANCED AUTH HOOK
+// ENHANCED AUTH HOOK - AUTH v2
 // ============================================================================
 
 /**
- * Comprehensive authentication hook that combines Zustand store and React Query
+ * Comprehensive authentication hook for cookie-based auth
  * Provides a unified interface for all authentication operations
  */
 const useAuth = () => {
@@ -37,19 +36,22 @@ const useAuth = () => {
     isLoading: storeLoading,
     error: storeError,
     canLogin,
+    lastChecked,
+    needsRecheck,
   } = useAuthStore((state) => ({
     isAuthenticated: authSelectors.isAuthenticated(state),
     user: authSelectors.user(state),
     isLoading: authSelectors.isLoading(state),
     error: authSelectors.error(state),
     canLogin: authSelectors.canLogin(state),
+    lastChecked: authSelectors.lastChecked(state),
+    needsRecheck: authSelectors.needsRecheck(state),
   }));
 
   // ========================================================================
   // QUERIES AND MUTATIONS
   // ========================================================================
   
-  const { data: currentUser, isLoading: userLoading, error: userError } = useCurrentUser();
   const loginMutation = useLoginMutation();
   const registerMutation = useRegisterMutation();
   const logoutMutation = useLogoutMutation();
@@ -58,60 +60,107 @@ const useAuth = () => {
   const forgotPasswordMutation = useForgotPasswordMutation();
   const resetPasswordMutation = useResetPasswordMutation();
   const deleteAccountMutation = useDeleteAccountMutation();
-  const { refreshToken, isRefreshing } = useTokenRefresh();
+  
+  // Current user query for /me endpoint
+  const { 
+    data: currentUserData, 
+    isLoading: userLoading, 
+    error: userError,
+    refetch: refetchUser 
+  } = useCurrentUser();
 
   // ========================================================================
-  // COMPUTED VALUES
+  // COMPUTED STATE
   // ========================================================================
   
-  const user = currentUser || storeUser;
-  const isLoading = storeLoading || userLoading || isRefreshing;
-  const error = storeError || (userError instanceof Error ? userError.message : null);
-  
-  const isLoggedIn = isAuthenticated && !!user && !error;
-  const needsProfileCompletion = user && (!user.birthData || !user.birthData.birthDate);
-  const isAdmin = user?.isAdmin || false;
+  const user = currentUserData || storeUser;
+  const isLoading = storeLoading || userLoading;
+  const error = storeError || (userError as any)?.message;
 
   // ========================================================================
-  // AUTHENTICATION ACTIONS
+  // AUTH ACTIONS
   // ========================================================================
-  
+
   /**
-   * Login with credentials
+   * Login with email and password
    */
   const login = useCallback(async (credentials: LoginCredentials) => {
     try {
-      const result = await loginMutation.mutateAsync(credentials);
-      return result;
-    } catch (error) {
-      console.error('Login failed:', error);
+      authStore.setLoading(true);
+      authStore.setError(null);
+      
+      // Call login endpoint (sets cookie)
+      const response = await loginMutation.mutateAsync(credentials);
+      
+      if (response.ok && response.user) {
+        // Update store with user data
+        authStore.login(response.user);
+        
+        // Immediately call /me to get fresh user data
+        const meResponse = await refetchUser();
+        if (meResponse.data) {
+          authStore.setUser(meResponse.data);
+        }
+      }
+      
+      return response;
+    } catch (error: any) {
+      authStore.setError(error.message || 'Login failed');
       throw error;
+    } finally {
+      authStore.setLoading(false);
     }
-  }, [loginMutation]);
+  }, [loginMutation, authStore, refetchUser]);
 
   /**
    * Register new user
    */
-  const register = useCallback(async (registerData: RegisterData) => {
+  const register = useCallback(async (data: RegisterData) => {
     try {
-      const result = await registerMutation.mutateAsync(registerData);
-      return result;
-    } catch (error) {
-      console.error('Registration failed:', error);
+      authStore.setLoading(true);
+      authStore.setError(null);
+      
+      const response = await registerMutation.mutateAsync(data);
+      
+      if (response.ok && response.user) {
+        authStore.login(response.user);
+      }
+      
+      return response;
+    } catch (error: any) {
+      authStore.setError(error.message || 'Registration failed');
       throw error;
+    } finally {
+      authStore.setLoading(false);
     }
-  }, [registerMutation]);
+  }, [registerMutation, authStore]);
 
   /**
    * Logout user
    */
   const logout = useCallback(async () => {
     try {
+      authStore.setLoading(true);
+      
+      // Call logout endpoint (clears cookie)
       await logoutMutation.mutateAsync();
-    } catch (error) {
-      console.error('Logout failed:', error);
-      // Force logout even on error
+      
+      // Clear local state
       authStore.logout();
+      
+      // Broadcast logout to other tabs
+      if (typeof window !== 'undefined' && window.BroadcastChannel) {
+        const channel = new BroadcastChannel('glow-auth');
+        channel.postMessage({ type: 'LOGOUT' });
+        channel.close();
+      }
+      
+    } catch (error: any) {
+      console.error('Logout error:', error);
+      // Clear local state even if API call fails
+      authStore.logout();
+    } finally {
+      authStore.setLoading(false);
     }
   }, [logoutMutation, authStore]);
 
@@ -120,309 +169,178 @@ const useAuth = () => {
    */
   const updateProfile = useCallback(async (updates: Partial<User>) => {
     try {
-      const result = await updateProfileMutation.mutateAsync(updates);
-      return result;
-    } catch (error) {
-      console.error('Profile update failed:', error);
+      authStore.setLoading(true);
+      authStore.setError(null);
+      
+      const response = await updateProfileMutation.mutateAsync(updates);
+      
+      if (response.user) {
+        authStore.updateUser(response.user);
+      }
+      
+      return response;
+    } catch (error: any) {
+      authStore.setError(error.message || 'Profile update failed');
       throw error;
+    } finally {
+      authStore.setLoading(false);
     }
-  }, [updateProfileMutation]);
+  }, [updateProfileMutation, authStore]);
 
   /**
    * Change password
    */
   const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
     try {
-      await changePasswordMutation.mutateAsync({ currentPassword, newPassword });
-    } catch (error) {
-      console.error('Password change failed:', error);
+      authStore.setLoading(true);
+      authStore.setError(null);
+      
+      const response = await changePasswordMutation.mutateAsync({
+        currentPassword,
+        newPassword,
+      });
+      
+      return response;
+    } catch (error: any) {
+      authStore.setError(error.message || 'Password change failed');
       throw error;
+    } finally {
+      authStore.setLoading(false);
     }
-  }, [changePasswordMutation]);
+  }, [changePasswordMutation, authStore]);
 
   /**
    * Request password reset
    */
   const forgotPassword = useCallback(async (email: string) => {
     try {
-      await forgotPasswordMutation.mutateAsync(email);
-    } catch (error) {
-      console.error('Forgot password failed:', error);
+      authStore.setLoading(true);
+      authStore.setError(null);
+      
+      const response = await forgotPasswordMutation.mutateAsync({ email });
+      
+      return response;
+    } catch (error: any) {
+      authStore.setError(error.message || 'Password reset request failed');
       throw error;
+    } finally {
+      authStore.setLoading(false);
     }
-  }, [forgotPasswordMutation]);
+  }, [forgotPasswordMutation, authStore]);
 
   /**
    * Reset password with token
    */
   const resetPassword = useCallback(async (token: string, newPassword: string) => {
     try {
-      await resetPasswordMutation.mutateAsync({ token, newPassword });
-    } catch (error) {
-      console.error('Password reset failed:', error);
+      authStore.setLoading(true);
+      authStore.setError(null);
+      
+      const response = await resetPasswordMutation.mutateAsync({ token, newPassword });
+      
+      return response;
+    } catch (error: any) {
+      authStore.setError(error.message || 'Password reset failed');
       throw error;
+    } finally {
+      authStore.setLoading(false);
     }
-  }, [resetPasswordMutation]);
+  }, [resetPasswordMutation, authStore]);
 
   /**
    * Delete user account
    */
   const deleteAccount = useCallback(async (password: string) => {
     try {
-      await deleteAccountMutation.mutateAsync(password);
-    } catch (error) {
-      console.error('Account deletion failed:', error);
+      authStore.setLoading(true);
+      authStore.setError(null);
+      
+      const response = await deleteAccountMutation.mutateAsync({ password });
+      
+      if (response.success) {
+        authStore.logout();
+      }
+      
+      return response;
+    } catch (error: any) {
+      authStore.setError(error.message || 'Account deletion failed');
       throw error;
+    } finally {
+      authStore.setLoading(false);
     }
-  }, [deleteAccountMutation]);
+  }, [deleteAccountMutation, authStore]);
+
+  /**
+   * Check authentication status via /me
+   */
+  const checkAuth = useCallback(async () => {
+    try {
+      const response = await refetchUser();
+      if (response.data) {
+        authStore.setUser(response.data);
+        return true;
+      } else {
+        authStore.logout();
+        return false;
+      }
+    } catch (error) {
+      authStore.logout();
+      return false;
+    }
+  }, [refetchUser, authStore]);
 
   // ========================================================================
-  // UTILITY ACTIONS
+  // CROSS-TAB SYNC
   // ========================================================================
-  
-  /**
-   * Clear authentication error
-   */
-  const clearError = useCallback(() => {
-    authStore.setError(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const channel = new BroadcastChannel('glow-auth');
+    
+    channel.onmessage = (event) => {
+      if (event.data.type === 'LOGOUT') {
+        authStore.logout();
+      } else if (event.data.type === 'LOGIN' && event.data.user) {
+        authStore.login(event.data.user);
+      }
+    };
+
+    return () => {
+      channel.close();
+    };
   }, [authStore]);
 
-  /**
-   * Check if user has specific permission
-   */
-  const hasPermission = useCallback((permission: string): boolean => {
-    if (!user) return false;
-    
-    // Admin has all permissions
-    if (user.isAdmin) return true;
-    
-    // Add specific permission logic here
-    // For now, authenticated users have basic permissions
-    return isAuthenticated;
-  }, [user, isAuthenticated]);
-
-  /**
-   * Get user display name
-   */
-  const getDisplayName = useCallback((): string => {
-    if (!user) return 'Guest';
-    
-    if (user.firstName && user.lastName) {
-      return `${user.firstName} ${user.lastName}`;
-    }
-    
-    if (user.firstName) return user.firstName;
-    if (user.username) return user.username;
-    
-    return 'User';
-  }, [user]);
-
   // ========================================================================
-  // EFFECTS
+  // RETURN INTERFACE
   // ========================================================================
-  
-  /**
-   * Initialize authentication state
-   */
-  useEffect(() => {
-    if (!authStore.isInitialized) {
-      authStore.setInitialized(true);
-    }
-  }, [authStore]);
 
-  /**
-   * Auto-refresh token when needed
-   */
-  useEffect(() => {
-    if (isAuthenticated && authStore.token) {
-      // Set up token refresh interval (every 50 minutes for 1-hour tokens)
-      const interval = setInterval(() => {
-        refreshToken();
-      }, 50 * 60 * 1000);
-
-      return () => clearInterval(interval);
-    }
-  }, [isAuthenticated, authStore.token, refreshToken]);
-
-  // ========================================================================
-  // RETURN OBJECT
-  // ========================================================================
-  
   return {
-    // ======================================================================
-    // STATE
-    // ======================================================================
-    
-    // Authentication status
+    // State
     isAuthenticated,
-    isLoggedIn,
+    user,
     isLoading,
     error,
-    
-    // User data
-    user,
-    needsProfileCompletion,
-    isAdmin,
-    
-    // Security state
     canLogin,
-    
-    // Loading states for specific operations
-    isLoggingIn: loginMutation.isPending,
-    isRegistering: registerMutation.isPending,
-    isLoggingOut: logoutMutation.isPending,
-    isUpdatingProfile: updateProfileMutation.isPending,
-    isChangingPassword: changePasswordMutation.isPending,
-    isForgettingPassword: forgotPasswordMutation.isPending,
-    isResettingPassword: resetPasswordMutation.isPending,
-    isDeletingAccount: deleteAccountMutation.isPending,
-    isRefreshingToken: isRefreshing,
-    
-    // ======================================================================
-    // ACTIONS
-    // ======================================================================
-    
-    // Authentication
+    lastChecked,
+    needsRecheck,
+
+    // Actions
     login,
     register,
     logout,
-    
-    // Profile management
     updateProfile,
-    
-    // Password management
     changePassword,
     forgotPassword,
     resetPassword,
-    
-    // Account management
     deleteAccount,
-    
-    // Utility functions
-    clearError,
-    hasPermission,
-    getDisplayName,
-    refreshToken,
-    
-    // ======================================================================
-    // COMPUTED VALUES
-    // ======================================================================
-    
-    // User info
-    userName: getDisplayName(),
-    userEmail: user?.email || '',
-    userId: user?.id || '',
-    
-    // Permissions
-    canEditProfile: isAuthenticated,
-    canChangePassword: isAuthenticated,
-    canDeleteAccount: isAuthenticated,
-    canAccessAdmin: isAdmin,
-    
-    // Profile completion status
-    profileCompletionPercentage: user ? calculateProfileCompletion(user) : 0,
-    missingProfileFields: user ? getMissingProfileFields(user) : [],
+    checkAuth,
+
+    // Utilities
+    clearError: () => authStore.setError(null),
+    setLoading: authStore.setLoading,
   };
 };
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
-/**
- * Calculate profile completion percentage
- */
-function calculateProfileCompletion(user: User): number {
-  const fields = [
-    user.firstName,
-    user.lastName,
-    user.email,
-    user.birthData?.birthDate,
-    user.birthData?.birthTime,
-    user.birthData?.birthLocation,
-    user.photos && user.photos.length > 0,
-    user.bio,
-  ];
-  
-  const completedFields = fields.filter(Boolean).length;
-  return Math.round((completedFields / fields.length) * 100);
-}
-
-/**
- * Get missing profile fields
- */
-function getMissingProfileFields(user: User): string[] {
-  const missing: string[] = [];
-  
-  if (!user.firstName) missing.push('First Name');
-  if (!user.lastName) missing.push('Last Name');
-  if (!user.birthData?.birthDate) missing.push('Birth Date');
-  if (!user.birthData?.birthTime) missing.push('Birth Time');
-  if (!user.birthData?.birthLocation) missing.push('Birth Location');
-  if (!user.photos || user.photos.length === 0) missing.push('Profile Photos');
-  if (!user.bio) missing.push('Bio');
-  
-  return missing;
-}
-
-// ============================================================================
-// SPECIALIZED HOOKS
-// ============================================================================
-
-/**
- * Hook for authentication status only
- */
-const useAuthStatus = () => {
-  const { isAuthenticated, isLoading, user } = useAuth();
-  
-  return {
-    isAuthenticated,
-    isLoading,
-    hasUser: !!user,
-  };
-};
-
-/**
- * Hook for user profile data only
- */
-const useAuthUser = () => {
-  const { user, isLoading, updateProfile, isUpdatingProfile } = useAuth();
-  
-  return {
-    user,
-    isLoading,
-    updateProfile,
-    isUpdating: isUpdatingProfile,
-  };
-};
-
-/**
- * Hook for authentication actions only
- */
-const useAuthActions = () => {
-  const { 
-    login, 
-    register, 
-    logout, 
-    isLoggingIn, 
-    isRegistering, 
-    isLoggingOut 
-  } = useAuth();
-  
-  return {
-    login,
-    register,
-    logout,
-    isLoggingIn,
-    isRegistering,
-    isLoggingOut,
-  };
-};
-
-// ============================================================================
-// EXPORTS
-// ============================================================================
 
 export default useAuth;
-export { useAuthStatus, useAuthUser, useAuthActions };
 

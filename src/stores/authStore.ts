@@ -1,5 +1,5 @@
 // Authentication Store - Zustand Implementation
-// Phase 2: DISSOLUTION - Client State Management
+// Auth v2: Cookie-based session management (no tokens)
 
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
@@ -14,28 +14,30 @@ export interface AuthState {
   // Authentication status
   isAuthenticated: boolean;
   user: User | null;
-  token: string | null;
-  refreshToken: string | null;
   
   // UI state
   isLoading: boolean;
   error: string | null;
   isInitialized: boolean;
+  
+  // Session metadata
+  lastChecked: number | null; // Timestamp of last /me check
 }
 
 export interface AuthActions {
   // Authentication actions
   setUser: (user: User | null) => void;
-  setTokens: (token: string, refreshToken: string) => void;
-  clearTokens: () => void;
   
   // UI actions
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setInitialized: (initialized: boolean) => void;
   
+  // Session actions
+  setLastChecked: (timestamp: number) => void;
+  
   // Complete actions
-  login: (user: User, token: string, refreshToken: string) => void;
+  login: (user: User) => void;
   logout: () => void;
   updateUser: (updates: Partial<User>) => void;
   
@@ -53,13 +55,14 @@ const initialState: AuthState = {
   // Authentication
   isAuthenticated: false,
   user: null,
-  token: null,
-  refreshToken: null,
   
   // UI state
   isLoading: false,
   error: null,
   isInitialized: false,
+  
+  // Session metadata
+  lastChecked: null,
 };
 
 // ============================================================================
@@ -82,20 +85,7 @@ export const useAuthStore = create<AuthStore>()(
             state.user = user;
             state.isAuthenticated = !!user;
             state.error = null;
-          });
-        },
-        
-        setTokens: (token, refreshToken) => {
-          set((state) => {
-            state.token = token;
-            state.refreshToken = refreshToken;
-          });
-        },
-        
-        clearTokens: () => {
-          set((state) => {
-            state.token = null;
-            state.refreshToken = null;
+            state.lastChecked = Date.now();
           });
         },
         
@@ -122,16 +112,25 @@ export const useAuthStore = create<AuthStore>()(
         },
         
         // ========================================================================
+        // SESSION ACTIONS
+        // ========================================================================
+        
+        setLastChecked: (timestamp) => {
+          set((state) => {
+            state.lastChecked = timestamp;
+          });
+        },
+        
+        // ========================================================================
         // COMPLETE ACTIONS
         // ========================================================================
         
-        login: (user, token, refreshToken) => {
+        login: (user) => {
           set((state) => {
             // Set authentication data
             state.user = user;
-            state.token = token;
-            state.refreshToken = refreshToken;
             state.isAuthenticated = true;
+            state.lastChecked = Date.now();
             
             // Clear UI state
             state.isLoading = false;
@@ -143,9 +142,8 @@ export const useAuthStore = create<AuthStore>()(
           set((state) => {
             // Clear authentication data
             state.user = null;
-            state.token = null;
-            state.refreshToken = null;
             state.isAuthenticated = false;
+            state.lastChecked = null;
             
             // Clear UI state
             state.isLoading = false;
@@ -170,40 +168,39 @@ export const useAuthStore = create<AuthStore>()(
         },
       })),
       {
-        name: 'glow-auth-store',
+        name: 'glow-auth-v2-store', // Changed name to avoid old localStorage conflicts
         
-        // Selective persistence - only persist important data
+        // Selective persistence - only persist user and UI preferences
         partialize: (state) => {
-          // Ensure partialize always returns a valid object
           try {
             return {
               user: state.user,
-              token: state.token,
-              refreshToken: state.refreshToken,
               isAuthenticated: state.isAuthenticated,
+              lastChecked: state.lastChecked,
             };
           } catch (error) {
             console.warn('AuthStore partialize error, returning empty state:', error);
             return {
               user: null,
-              token: null,
-              refreshToken: null,
               isAuthenticated: false,
+              lastChecked: null,
             };
           }
         },
         
         // Version for migration handling
-        version: 1,
+        version: 2, // Incremented for Auth v2
         
-        // Migration function for future updates
+        // Migration function for Auth v2
         migrate: (persistedState: any, version: number) => {
           try {
-            if (version === 0) {
-              // Migration from version 0 to 1
+            if (version < 2) {
+              // Migration from token-based to cookie-based auth
+              console.log('AuthStore: Migrating from token-based to cookie-based auth');
               return {
-                ...persistedState,
-                isInitialized: false,
+                user: persistedState?.user || null,
+                isAuthenticated: false, // Force re-authentication via /me
+                lastChecked: null,
               };
             }
             return persistedState;
@@ -219,7 +216,7 @@ export const useAuthStore = create<AuthStore>()(
             // Handle empty or invalid strings
             if (!str || str.trim() === '' || str === 'undefined' || str === 'null') {
               console.warn('AuthStore: Empty or invalid persisted value, using initial state');
-              return { state: initialState, version: 1 };
+              return { state: initialState, version: 2 };
             }
             
             const parsed = JSON.parse(str);
@@ -227,25 +224,26 @@ export const useAuthStore = create<AuthStore>()(
             // Validate the parsed object structure
             if (!parsed || typeof parsed !== 'object') {
               console.warn('AuthStore: Invalid persisted object structure, using initial state');
-              return { state: initialState, version: 1 };
+              return { state: initialState, version: 2 };
             }
             
             // Ensure state exists and is an object
             if (!parsed.state || typeof parsed.state !== 'object') {
               console.warn('AuthStore: Invalid state in persisted data, using initial state');
-              return { state: initialState, version: 1 };
+              return { state: initialState, version: 2 };
             }
             
             return parsed;
           } catch (error) {
             console.warn('AuthStore: JSON parse error, falling back to initial state:', error);
-            // Clear the corrupted value
+            // Clear the corrupted value and old token-based storage
             try {
-              localStorage.removeItem('glow-auth-store');
+              localStorage.removeItem('glow-auth-v2-store');
+              localStorage.removeItem('glow-auth-store'); // Remove old token-based storage
             } catch (clearError) {
               console.warn('AuthStore: Could not clear corrupted localStorage:', clearError);
             }
-            return { state: initialState, version: 1 };
+            return { state: initialState, version: 2 };
           }
         },
       }
@@ -268,11 +266,16 @@ export const authSelectors = {
   user: (state: AuthStore) => state.user,
   isLoading: (state: AuthStore) => state.isLoading,
   error: (state: AuthStore) => state.error,
+  lastChecked: (state: AuthStore) => state.lastChecked,
   
   // Computed selectors
   isLoggedIn: (state: AuthStore) => state.isAuthenticated && !!state.user,
-  hasToken: (state: AuthStore) => !!state.token,
   canLogin: (state: AuthStore) => !state.isLoading,
+  needsRecheck: (state: AuthStore) => {
+    if (!state.lastChecked) return true;
+    // Recheck if last check was more than 5 minutes ago
+    return Date.now() - state.lastChecked > 5 * 60 * 1000;
+  },
   
   // User info selectors
   userName: (state: AuthStore) => state.user?.firstName || state.user?.username || 'User',

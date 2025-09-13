@@ -1,4 +1,4 @@
-// Authentication Queries - React Query Implementation
+// Auth Queries - Auth v2 Cookie-based
 // Phase 2: DISSOLUTION - Server State Management
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,125 +9,155 @@ import type {
   LoginCredentials, 
   RegisterData, 
   User, 
-  AuthResponse,
-  RefreshTokenResponse 
 } from '../../core/types';
+
+// ============================================================================
+// QUERY KEYS
+// ============================================================================
+
+export const authQueryKeys = {
+  me: ['auth', 'me'] as const,
+  user: (id: string) => ['auth', 'user', id] as const,
+};
+
+// ============================================================================
+// CURRENT USER QUERY - SINGLE SOURCE OF TRUTH
+// ============================================================================
+
+/**
+ * Current user query - Auth v2 single source of truth via /api/auth/me
+ */
+export const useCurrentUser = () => {
+  const authStore = useAuthStore();
+
+  return useQuery({
+    queryKey: authQueryKeys.me,
+    queryFn: async () => {
+      const response = await apiClient.getCurrentUser();
+      
+      if (response.data.ok && response.data.user) {
+        // Update store with fresh user data
+        authStore.setUser(response.data.user);
+        return response.data.user;
+      } else {
+        // Clear store on auth failure
+        authStore.logout();
+        throw new Error(response.data.error || 'Authentication failed');
+      }
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    retry: (failureCount, error: any) => {
+      // Don't retry on 401 (auth required)
+      if (error?.status === 401) return false;
+      return failureCount < 2;
+    },
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+  });
+};
 
 // ============================================================================
 // AUTHENTICATION MUTATIONS
 // ============================================================================
 
 /**
- * Login mutation with automatic state management
+ * Login mutation with Auth v2 cookie flow
  */
-const useLoginMutation = () => {
+export const useLoginMutation = () => {
   const queryClient = useQueryClient();
   const authStore = useAuthStore();
 
   return useMutation({
-    mutationFn: async (credentials: LoginCredentials): Promise<AuthResponse> => {
-      try {
-        const response = await apiClient.login(credentials);
-        return response;
-      } catch (error) {
-        throw error;
-      }
+    mutationFn: async (credentials: LoginCredentials) => {
+      const response = await apiClient.login(credentials);
+      return response.data;
     },
 
     onMutate: async (credentials) => {
       // Set loading state
       authStore.setLoading(true);
       authStore.setError(null);
-
       return { credentials };
     },
 
     onSuccess: async (data, variables) => {
-      // Update auth store with successful login
-      authStore.login(data.user, data.token, data.refreshToken);
+      if (data.ok && data.user) {
+        // Update store with login response
+        authStore.login(data.user);
 
-      // Trust pattern: immediately call /api/auth/me for authoritative user state
-      try {
-        const meResponse = await apiClient.getCurrentUser();
-        if (meResponse.success && meResponse.data) {
-          // Update with authoritative user data from /me
-          authStore.setUser(meResponse.data);
-          console.log('User state hydrated from /api/auth/me:', meResponse.data.email);
+        // Trust pattern: immediately call /api/auth/me for authoritative state
+        try {
+          await queryClient.refetchQueries({ queryKey: authQueryKeys.me });
+        } catch (error) {
+          console.warn('Failed to refetch user after login:', error);
         }
-      } catch (error) {
-        console.warn('Failed to fetch user from /api/auth/me:', error);
-        // Continue with login response data as fallback
+
+        // Broadcast login to other tabs
+        if (typeof window !== 'undefined' && window.BroadcastChannel) {
+          const channel = new BroadcastChannel('glow-auth');
+          channel.postMessage({ type: 'LOGIN', user: data.user });
+          channel.close();
+        }
+
+        // Invalidate all auth-related queries
+        await invalidateQueries(queryClient, ['auth']);
       }
-
-      // Invalidate and refetch user-related queries
-      invalidateQueries.auth();
-      
-      // Prefetch user profile data
-      getQueryClient().prefetchQuery({
-        queryKey: queryKeys.profiles.profile(data.user.id),
-        queryFn: () => apiClient.getUserProfile(data.user.id),
-        staleTime: 5 * 60 * 1000, // 5 minutes
-      });
-
-      console.log('Login successful:', data.user.email);
     },
 
-    onError: (error, variables) => {
-      console.error('Login failed:', error);
-      
-      // Set error in auth store
-      if (error instanceof Error) {
-        authStore.setError(error.message);
-      } else {
-        authStore.setError('Login failed. Please try again.');
-      }
+    onError: (error: any, variables) => {
+      authStore.setError(error.message || 'Login failed');
     },
 
     onSettled: () => {
-      // Always clear loading state
       authStore.setLoading(false);
     },
   });
 };
 
 /**
- * Registration mutation with profile setup
+ * Register mutation
  */
-const useRegisterMutation = () => {
+export const useRegisterMutation = () => {
   const queryClient = useQueryClient();
   const authStore = useAuthStore();
 
   return useMutation({
-    mutationFn: async (registerData: RegisterData): Promise<AuthResponse> => {
-      const response = await apiClient.register(registerData);
-      return response;
+    mutationFn: async (data: RegisterData) => {
+      const response = await apiClient.register(data);
+      return response.data;
     },
 
-    onMutate: async (registerData) => {
+    onMutate: async (data) => {
       authStore.setLoading(true);
       authStore.setError(null);
-
-      return { registerData };
+      return { data };
     },
 
-    onSuccess: (data, variables) => {
-      // Update auth store with new user
-      authStore.login(data.user, data.token, data.refreshToken);
+    onSuccess: async (data, variables) => {
+      if (data.ok && data.user) {
+        authStore.login(data.user);
 
-      // Invalidate auth queries
-      invalidateQueries.auth();
+        // Trust pattern: call /me for authoritative state
+        try {
+          await queryClient.refetchQueries({ queryKey: authQueryKeys.me });
+        } catch (error) {
+          console.warn('Failed to refetch user after register:', error);
+        }
 
-      console.log('Registration successful:', data.user.email);
-    },
+        // Broadcast login to other tabs
+        if (typeof window !== 'undefined' && window.BroadcastChannel) {
+          const channel = new BroadcastChannel('glow-auth');
+          channel.postMessage({ type: 'LOGIN', user: data.user });
+          channel.close();
+        }
 
-    onError: (error, variables) => {
-      console.error('Registration failed:', error);
-      
-      if (error instanceof Error) {
-        authStore.setError(error.message);
-      } else {
-        authStore.setError('Registration failed. Please try again.');
+        await invalidateQueries(queryClient, ['auth']);
       }
+    },
+
+    onError: (error: any, variables) => {
+      authStore.setError(error.message || 'Registration failed');
     },
 
     onSettled: () => {
@@ -137,45 +167,43 @@ const useRegisterMutation = () => {
 };
 
 /**
- * Logout mutation with cleanup
+ * Logout mutation
  */
-const useLogoutMutation = () => {
+export const useLogoutMutation = () => {
   const queryClient = useQueryClient();
   const authStore = useAuthStore();
 
   return useMutation({
-    mutationFn: async (): Promise<void> => {
-      // Call logout endpoint if token exists
-      if (authStore.token) {
-        try {
-          await apiClient.logout();
-        } catch (error) {
-          // Continue with logout even if API call fails
-          console.warn('Logout API call failed:', error);
-        }
-      }
+    mutationFn: async () => {
+      const response = await apiClient.logout();
+      return response.data;
     },
 
     onMutate: async () => {
       authStore.setLoading(true);
+      return {};
     },
 
-    onSuccess: () => {
-      // Clear auth store
+    onSuccess: async (data) => {
+      // Clear local state
       authStore.logout();
+
+      // Broadcast logout to other tabs
+      if (typeof window !== 'undefined' && window.BroadcastChannel) {
+        const channel = new BroadcastChannel('glow-auth');
+        channel.postMessage({ type: 'LOGOUT' });
+        channel.close();
+      }
 
       // Clear all cached data
-      getQueryClient().clear();
-
-      console.log('Logout successful');
+      queryClient.clear();
     },
 
-    onError: (error) => {
-      console.error('Logout failed:', error);
-      
-      // Force logout even on error
+    onError: (error: any) => {
+      console.error('Logout error:', error);
+      // Clear local state even if API call fails
       authStore.logout();
-      getQueryClient().clear();
+      queryClient.clear();
     },
 
     onSettled: () => {
@@ -184,69 +212,29 @@ const useLogoutMutation = () => {
   });
 };
 
-/**
- * Refresh token mutation for automatic token renewal
- */
-const useRefreshTokenMutation = () => {
-  const authStore = useAuthStore();
-
-  return useMutation({
-    mutationFn: async (): Promise<RefreshTokenResponse> => {
-      const refreshToken = authStore.refreshToken;
-      
-      if (!refreshToken) {
-        throw new Error('No refresh token available');
-      }
-
-      const response = await apiClient.refreshToken(refreshToken);
-      return response;
-    },
-
-    onSuccess: (data) => {
-      // Update tokens in auth store
-      authStore.setTokens(data.token, data.refreshToken);
-      
-      console.log('Token refreshed successfully');
-    },
-
-    onError: (error) => {
-      console.error('Token refresh failed:', error);
-      
-      // Force logout on refresh failure
-      authStore.logout();
-    },
-
-    // Don't retry token refresh
-    retry: false,
-  });
-};
-
 // ============================================================================
-// USER PROFILE MUTATIONS
+// PROFILE MUTATIONS
 // ============================================================================
 
 /**
- * Update user profile mutation
+ * Update profile mutation
  */
-const useUpdateProfileMutation = () => {
+export const useUpdateProfileMutation = () => {
   const queryClient = useQueryClient();
   const authStore = useAuthStore();
 
   return useMutation({
-    mutationFn: async (updates: Partial<User>): Promise<User> => {
-      const userId = authStore.user?.id;
-      if (!userId) {
-        throw new Error('User not authenticated');
-      }
-
-      const response = await apiClient.updateUserProfile(userId, updates);
-      return response;
+    mutationFn: async (updates: Partial<User>) => {
+      const response = await apiClient.updateProfile(updates);
+      return response.data;
     },
 
     onMutate: async (updates) => {
+      authStore.setLoading(true);
+      authStore.setError(null);
+
       // Optimistic update
       const previousUser = authStore.user;
-      
       if (previousUser) {
         authStore.updateUser(updates);
       }
@@ -254,151 +242,53 @@ const useUpdateProfileMutation = () => {
       return { previousUser };
     },
 
-    onSuccess: (updatedUser, variables) => {
-      // Update auth store with server response
-      authStore.setUser(updatedUser);
-
-      // Invalidate related queries
-      getQueryClient().invalidateQueries({ 
-        queryKey: queryKeys.profiles.profile(updatedUser.id) 
-      });
-
-      console.log('Profile updated successfully');
+    onSuccess: async (data, variables) => {
+      if (data.user) {
+        authStore.updateUser(data.user);
+        
+        // Invalidate user queries
+        await queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
+      }
     },
 
-    onError: (error, variables, context) => {
-      console.error('Profile update failed:', error);
-
-      // Rollback optimistic update
+    onError: (error: any, variables, context) => {
+      // Revert optimistic update
       if (context?.previousUser) {
         authStore.setUser(context.previousUser);
       }
+      authStore.setError(error.message || 'Profile update failed');
+    },
+
+    onSettled: () => {
+      authStore.setLoading(false);
     },
   });
 };
-
-/**
- * Update birth data mutation
- */
-const useUpdateBirthDataMutation = () => {
-  const queryClient = useQueryClient();
-  const authStore = useAuthStore();
-
-  return useMutation({
-    mutationFn: async (birthData: any): Promise<User> => {
-      if (!authStore.user?.id) {
-        throw new Error('User not authenticated');
-      }
-
-      const response = await apiClient.updateBirthData(birthData);
-      return response;
-    },
-
-    onSuccess: (updatedUser) => {
-      // Update auth store
-      authStore.setUser(updatedUser);
-
-      // Invalidate compatibility-related queries
-      getQueryClient().invalidateQueries({ 
-        queryKey: queryKeys.matches.all 
-      });
-
-      console.log('Birth data updated successfully');
-    },
-
-    onError: (error) => {
-      console.error('Birth data update failed:', error);
-    },
-  });
-};
-
-// ============================================================================
-// USER QUERIES
-// ============================================================================
-
-/**
- * Current user query with automatic refresh
- */
-const useCurrentUser = () => {
-  const authStore = useAuthStore();
-
-  return useQuery({
-    queryKey: queryKeys.auth.currentUser(),
-    queryFn: async (): Promise<User> => {
-      const response = await apiClient.getCurrentUser();
-      return response;
-    },
-    enabled: authStore.isAuthenticated && !!authStore.token,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    retry: (failureCount, error) => {
-      // Don't retry on auth errors
-      if (error instanceof Error && error.message.includes('401')) {
-        return false;
-      }
-      return failureCount < 2;
-    },
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: true,
-  });
-};
-
-/**
- * User profile query by ID
- */
-const useUserProfile = (userId: string, enabled: boolean = true) => {
-  return useQuery({
-    queryKey: queryKeys.profiles.profile(userId),
-    queryFn: async (): Promise<User> => {
-      const response = await apiClient.getUserProfile(userId);
-      return response;
-    },
-    enabled: enabled && !!userId,
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes
-  });
-};
-
-/**
- * User birth data query
- */
-const useUserBirthData = (userId: string, enabled: boolean = true) => {
-  return useQuery({
-    queryKey: queryKeys.profiles.birthData(userId),
-    queryFn: async () => {
-      const response = await apiClient.getUserBirthData(userId);
-      return response;
-    },
-    enabled: enabled && !!userId,
-    staleTime: 60 * 60 * 1000, // 1 hour - birth data rarely changes
-    gcTime: 24 * 60 * 60 * 1000, // 24 hours
-  });
-};
-
-// ============================================================================
-// PASSWORD MANAGEMENT
-// ============================================================================
 
 /**
  * Change password mutation
  */
-const useChangePasswordMutation = () => {
+export const useChangePasswordMutation = () => {
   const authStore = useAuthStore();
 
   return useMutation({
-    mutationFn: async (data: { currentPassword: string; newPassword: string }): Promise<void> => {
-      await apiClient.changePassword(data.currentPassword, data.newPassword);
+    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
+      const response = await apiClient.changePassword(data);
+      return response.data;
     },
 
-    onSuccess: () => {
-      console.log('Password changed successfully');
-      
-      // Optionally force re-login for security
-      // authStore.logout();
+    onMutate: async (data) => {
+      authStore.setLoading(true);
+      authStore.setError(null);
+      return { data };
     },
 
-    onError: (error) => {
-      console.error('Password change failed:', error);
+    onError: (error: any, variables) => {
+      authStore.setError(error.message || 'Password change failed');
+    },
+
+    onSettled: () => {
+      authStore.setLoading(false);
     },
   });
 };
@@ -406,18 +296,27 @@ const useChangePasswordMutation = () => {
 /**
  * Forgot password mutation
  */
-const useForgotPasswordMutation = () => {
+export const useForgotPasswordMutation = () => {
+  const authStore = useAuthStore();
+
   return useMutation({
-    mutationFn: async (email: string): Promise<void> => {
-      await apiClient.forgotPassword(email);
+    mutationFn: async (data: { email: string }) => {
+      const response = await apiClient.forgotPassword(data);
+      return response.data;
     },
 
-    onSuccess: () => {
-      console.log('Password reset email sent');
+    onMutate: async (data) => {
+      authStore.setLoading(true);
+      authStore.setError(null);
+      return { data };
     },
 
-    onError: (error) => {
-      console.error('Forgot password failed:', error);
+    onError: (error: any, variables) => {
+      authStore.setError(error.message || 'Password reset request failed');
+    },
+
+    onSettled: () => {
+      authStore.setLoading(false);
     },
   });
 };
@@ -425,115 +324,131 @@ const useForgotPasswordMutation = () => {
 /**
  * Reset password mutation
  */
-const useResetPasswordMutation = () => {
+export const useResetPasswordMutation = () => {
+  const authStore = useAuthStore();
+
   return useMutation({
-    mutationFn: async (data: { token: string; newPassword: string }): Promise<void> => {
-      await apiClient.resetPassword(data.token, data.newPassword);
+    mutationFn: async (data: { token: string; newPassword: string }) => {
+      const response = await apiClient.resetPassword(data);
+      return response.data;
     },
 
-    onSuccess: () => {
-      console.log('Password reset successful');
+    onMutate: async (data) => {
+      authStore.setLoading(true);
+      authStore.setError(null);
+      return { data };
     },
 
-    onError: (error) => {
-      console.error('Password reset failed:', error);
+    onError: (error: any, variables) => {
+      authStore.setError(error.message || 'Password reset failed');
+    },
+
+    onSettled: () => {
+      authStore.setLoading(false);
     },
   });
 };
-
-// ============================================================================
-// ACCOUNT MANAGEMENT
-// ============================================================================
 
 /**
  * Delete account mutation
  */
-const useDeleteAccountMutation = () => {
+export const useDeleteAccountMutation = () => {
   const queryClient = useQueryClient();
   const authStore = useAuthStore();
 
   return useMutation({
-    mutationFn: async (password: string): Promise<void> => {
-      await apiClient.deleteAccount(password);
+    mutationFn: async (data: { password: string }) => {
+      const response = await apiClient.deleteAccount(data);
+      return response.data;
     },
 
-    onSuccess: () => {
-      // Clear all data and logout
-      authStore.logout();
-      getQueryClient().clear();
-      
-      console.log('Account deleted successfully');
+    onMutate: async (data) => {
+      authStore.setLoading(true);
+      authStore.setError(null);
+      return { data };
     },
 
-    onError: (error) => {
-      console.error('Account deletion failed:', error);
+    onSuccess: async (data) => {
+      if (data.success) {
+        // Clear all state and redirect
+        authStore.logout();
+        queryClient.clear();
+        
+        // Broadcast logout to other tabs
+        if (typeof window !== 'undefined' && window.BroadcastChannel) {
+          const channel = new BroadcastChannel('glow-auth');
+          channel.postMessage({ type: 'LOGOUT' });
+          channel.close();
+        }
+      }
+    },
+
+    onError: (error: any, variables) => {
+      authStore.setError(error.message || 'Account deletion failed');
+    },
+
+    onSettled: () => {
+      authStore.setLoading(false);
     },
   });
 };
 
-// ============================================================================
-// UTILITIES
-// ============================================================================
 
 /**
- * Hook to check if user is authenticated with fresh data
+ * Update birth data mutation
  */
-const useIsAuthenticated = () => {
+export const useUpdateBirthDataMutation = () => {
+  const queryClient = useQueryClient();
   const authStore = useAuthStore();
-  const { data: currentUser, isLoading, error } = useCurrentUser();
 
-  return {
-    isAuthenticated: authStore.isAuthenticated && !error,
-    user: currentUser || authStore.user,
-    isLoading: isLoading || authStore.isLoading,
-    error: error || authStore.error,
-  };
-};
+  return useMutation({
+    mutationFn: async (birthData: any) => {
+      const response = await apiClient.updateBirthData(birthData);
+      return response.data;
+    },
 
-/**
- * Hook for automatic token refresh
- */
-const useTokenRefresh = () => {
-  const authStore = useAuthStore();
-  const refreshMutation = useRefreshTokenMutation();
+    onMutate: async (birthData) => {
+      authStore.setLoading(true);
+      authStore.setError(null);
+      return { birthData };
+    },
 
-  // Auto-refresh token when it's about to expire
-  // This would typically be called by an interval or axios interceptor
-  const refreshToken = async () => {
-    if (authStore.token && authStore.refreshToken) {
-      try {
-        await refreshMutation.mutateAsync();
-      } catch (error) {
-        console.error('Auto token refresh failed:', error);
+    onSuccess: async (data, variables) => {
+      if (data.user) {
+        authStore.updateUser(data.user);
+        
+        // Invalidate user queries
+        await queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
       }
-    }
-  };
+    },
 
-  return {
-    refreshToken,
-    isRefreshing: refreshMutation.isPending,
-  };
+    onError: (error: any, variables) => {
+      authStore.setError(error.message || 'Birth data update failed');
+    },
+
+    onSettled: () => {
+      authStore.setLoading(false);
+    },
+  });
 };
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
 
-export {
-  useLoginMutation,
-  useRegisterMutation,
-  useLogoutMutation,
-  useRefreshTokenMutation,
-  useUpdateProfileMutation,
-  useUpdateBirthDataMutation,
-  useCurrentUser,
-  useUserProfile,
-  useUserBirthData,
-  useChangePasswordMutation,
-  useForgotPasswordMutation,
-  useResetPasswordMutation,
-  useDeleteAccountMutation,
-  useIsAuthenticated,
-  useTokenRefresh,
+/**
+ * User birth data query
+ */
+export const useUserBirthData = () => {
+  const { user } = useAuthStore();
+
+  return useQuery({
+    queryKey: ['user', 'birthData', user?.id],
+    queryFn: async () => {
+      if (!user?.birthData) {
+        return null;
+      }
+      return user.birthData;
+    },
+    enabled: !!user,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
 };
 
