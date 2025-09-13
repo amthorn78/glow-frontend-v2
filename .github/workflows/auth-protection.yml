@@ -1,0 +1,209 @@
+name: Auth v2 Protection Gates
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  # Phase A: Immediate CI Gates - Production Contract Validation
+  auth-contracts-prod-smoke:
+    name: Auth Contracts (Production)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Newman (Postman CLI)
+        run: npm install -g newman
+
+      - name: Test Auth Contracts
+        run: |
+          # Health check
+          echo "Testing /api/health..."
+          HEALTH_RESPONSE=$(curl -s -w "%{http_code}:%{content_type}" https://www.glowme.io/api/health)
+          HTTP_CODE=$(echo $HEALTH_RESPONSE | cut -d: -f1)
+          CONTENT_TYPE=$(echo $HEALTH_RESPONSE | cut -d: -f2)
+          
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Health check failed: HTTP $HTTP_CODE"
+            exit 1
+          fi
+          
+          if [[ "$CONTENT_TYPE" != *"application/json"* ]]; then
+            echo "❌ Health check returned non-JSON: $CONTENT_TYPE"
+            exit 1
+          fi
+          
+          echo "✅ Health check passed"
+
+          # Login contract test
+          echo "Testing /api/auth/login contract..."
+          LOGIN_RESPONSE=$(curl -s -i -X POST https://www.glowme.io/api/auth/login \
+            -H 'Content-Type: application/json' \
+            --data '{"email":"admin@glow.app","password":"admin123"}')
+          
+          # Check for 200 status
+          if ! echo "$LOGIN_RESPONSE" | grep -q "HTTP/.*200"; then
+            echo "❌ Login failed - not 200 status"
+            echo "$LOGIN_RESPONSE"
+            exit 1
+          fi
+          
+          # Check for JSON content type
+          if ! echo "$LOGIN_RESPONSE" | grep -q "content-type:.*application/json"; then
+            echo "❌ Login returned non-JSON response"
+            exit 1
+          fi
+          
+          # Check for required cookie attributes
+          COOKIE_LINE=$(echo "$LOGIN_RESPONSE" | grep -i "set-cookie:" | head -1)
+          
+          if [[ -z "$COOKIE_LINE" ]]; then
+            echo "❌ No Set-Cookie header found"
+            exit 1
+          fi
+          
+          if [[ "$COOKIE_LINE" != *"HttpOnly"* ]]; then
+            echo "❌ Missing HttpOnly attribute: $COOKIE_LINE"
+            exit 1
+          fi
+          
+          if [[ "$COOKIE_LINE" != *"Secure"* ]]; then
+            echo "❌ Missing Secure attribute: $COOKIE_LINE"
+            exit 1
+          fi
+          
+          if [[ "$COOKIE_LINE" != *"SameSite=Lax"* ]]; then
+            echo "❌ Missing SameSite=Lax attribute: $COOKIE_LINE"
+            exit 1
+          fi
+          
+          if [[ "$COOKIE_LINE" != *"Path=/"* ]]; then
+            echo "❌ Missing Path=/ attribute: $COOKIE_LINE"
+            exit 1
+          fi
+          
+          echo "✅ Login contract passed"
+          
+          # Extract cookie for authenticated tests
+          COOKIE=$(echo "$COOKIE_LINE" | sed 's/.*set-cookie: *\([^;]*\).*/\1/i')
+          
+          # Test /me with cookie (authenticated)
+          echo "Testing /api/auth/me (authenticated)..."
+          ME_AUTH_RESPONSE=$(curl -s -w "%{http_code}:%{content_type}" \
+            -H "Cookie: $COOKIE" \
+            https://www.glowme.io/api/auth/me)
+          
+          ME_HTTP_CODE=$(echo $ME_AUTH_RESPONSE | cut -d: -f1)
+          ME_CONTENT_TYPE=$(echo $ME_AUTH_RESPONSE | cut -d: -f2)
+          
+          if [ "$ME_HTTP_CODE" != "200" ]; then
+            echo "❌ /me authenticated failed: HTTP $ME_HTTP_CODE"
+            exit 1
+          fi
+          
+          if [[ "$ME_CONTENT_TYPE" != *"application/json"* ]]; then
+            echo "❌ /me authenticated returned non-JSON: $ME_CONTENT_TYPE"
+            exit 1
+          fi
+          
+          echo "✅ /me authenticated passed"
+          
+          # Test logout
+          echo "Testing /api/auth/logout..."
+          LOGOUT_RESPONSE=$(curl -s -w "%{http_code}:%{content_type}" \
+            -X POST \
+            -H "Cookie: $COOKIE" \
+            https://www.glowme.io/api/auth/logout)
+          
+          LOGOUT_HTTP_CODE=$(echo $LOGOUT_RESPONSE | cut -d: -f1)
+          LOGOUT_CONTENT_TYPE=$(echo $LOGOUT_RESPONSE | cut -d: -f2)
+          
+          if [ "$LOGOUT_HTTP_CODE" != "200" ]; then
+            echo "❌ Logout failed: HTTP $LOGOUT_HTTP_CODE"
+            exit 1
+          fi
+          
+          if [[ "$LOGOUT_CONTENT_TYPE" != *"application/json"* ]]; then
+            echo "❌ Logout returned non-JSON: $LOGOUT_CONTENT_TYPE"
+            exit 1
+          fi
+          
+          echo "✅ Logout passed"
+          
+          # Test /me without cookie (unauthenticated)
+          echo "Testing /api/auth/me (unauthenticated)..."
+          ME_UNAUTH_RESPONSE=$(curl -s -w "%{http_code}:%{content_type}" \
+            https://www.glowme.io/api/auth/me)
+          
+          ME_UNAUTH_HTTP_CODE=$(echo $ME_UNAUTH_RESPONSE | cut -d: -f1)
+          ME_UNAUTH_CONTENT_TYPE=$(echo $ME_UNAUTH_RESPONSE | cut -d: -f2)
+          
+          if [ "$ME_UNAUTH_HTTP_CODE" != "401" ]; then
+            echo "❌ /me unauthenticated should return 401, got: HTTP $ME_UNAUTH_HTTP_CODE"
+            exit 1
+          fi
+          
+          if [[ "$ME_UNAUTH_CONTENT_TYPE" != *"application/json"* ]]; then
+            echo "❌ /me unauthenticated returned non-JSON: $ME_UNAUTH_CONTENT_TYPE"
+            exit 1
+          fi
+          
+          echo "✅ /me unauthenticated passed"
+          echo "🎉 All auth contracts validated successfully!"
+
+  # Phase C: Static Guards - Forbidden Pattern Detection
+  auth-static-guards:
+    name: Auth Static Guards
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for forbidden patterns
+        run: |
+          echo "Checking for forbidden patterns in frontend code..."
+          
+          # Check for absolute URLs in API client (exclude external APIs like OpenStreetMap)
+          if grep -r "https\?://" src/ --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" | grep -v "//.*https\?://" | grep -v "console\|comment" | grep -v "nominatim.openstreetmap.org\|images.unsplash.com" | grep -E "(api|auth|login|logout|me)" ; then
+            echo "❌ Found absolute URLs in auth-related frontend code (should use relative /api/*)"
+            exit 1
+          fi
+          
+          # Check for Authorization headers
+          if grep -r "Authorization\|Bearer " src/ --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" | grep -v "//.*Authorization\|//.*Bearer"; then
+            echo "❌ Found Authorization/Bearer headers (Auth v2 uses cookies only)"
+            exit 1
+          fi
+          
+          # Check for token storage (exclude cleanup of old storage)
+          if grep -r "localStorage.*token\|sessionStorage.*token" src/ --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" | grep -v "removeItem.*glow-auth-store"; then
+            echo "❌ Found token storage in localStorage/sessionStorage (Auth v2 uses cookies only)"
+            exit 1
+          fi
+          
+          # Check for throwing on /me 401 (simplified check)
+          if grep -A5 -B5 "/api/auth/me" src/ --include="*.ts" --include="*.tsx" | grep -A10 -B10 "throw.*401\|throw.*AUTH_REQUIRED"; then
+            echo "❌ Found throwing on /me 401 (should treat as valid unauthenticated state)"
+            exit 1
+          fi
+          
+          echo "✅ All static guards passed"
+
+  # Phase B: Preview E2E (placeholder for now)
+  auth-e2e-preview:
+    name: Auth E2E (Preview)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Placeholder E2E test
+        run: |
+          echo "🚧 E2E tests will be implemented in Phase B"
+          echo "This job ensures the workflow structure is ready"
+          echo "✅ Placeholder passed"
+

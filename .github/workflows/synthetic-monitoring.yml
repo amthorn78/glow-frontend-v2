@@ -1,0 +1,122 @@
+name: Auth v2 Synthetic Monitoring
+
+on:
+  schedule:
+    # Run every 10 minutes
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  synthetic-auth-monitoring:
+    name: Production Auth Health Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run synthetic auth tests
+        run: |
+          echo "🔍 Running synthetic monitoring for Auth v2..."
+          
+          FAILURES=0
+          
+          # Health probe
+          echo "Testing /api/health..."
+          HEALTH_RESPONSE=$(curl -s -w "%{http_code}:%{content_type}" https://www.glowme.io/api/health)
+          HTTP_CODE=$(echo $HEALTH_RESPONSE | cut -d: -f1)
+          CONTENT_TYPE=$(echo $HEALTH_RESPONSE | cut -d: -f2)
+          
+          if [ "$HTTP_CODE" != "200" ] || [[ "$CONTENT_TYPE" != *"application/json"* ]]; then
+            echo "❌ Health probe failed: HTTP $HTTP_CODE, Content-Type: $CONTENT_TYPE"
+            FAILURES=$((FAILURES + 1))
+          else
+            echo "✅ Health probe passed"
+          fi
+          
+          # Login cookie probe
+          echo "Testing login cookie probe..."
+          LOGIN_RESPONSE=$(curl -s -i -X POST https://www.glowme.io/api/auth/login \
+            -H 'Content-Type: application/json' \
+            --data '{"email":"admin@glow.app","password":"admin123"}')
+          
+          if ! echo "$LOGIN_RESPONSE" | grep -q "HTTP/.*200"; then
+            echo "❌ Login cookie probe failed - not 200 status"
+            FAILURES=$((FAILURES + 1))
+          elif ! echo "$LOGIN_RESPONSE" | grep -q "content-type:.*application/json"; then
+            echo "❌ Login cookie probe failed - non-JSON response"
+            FAILURES=$((FAILURES + 1))
+          elif ! echo "$LOGIN_RESPONSE" | grep -qi "set-cookie:.*HttpOnly.*Secure.*SameSite=Lax"; then
+            echo "❌ Login cookie probe failed - missing required cookie attributes"
+            FAILURES=$((FAILURES + 1))
+          else
+            echo "✅ Login cookie probe passed"
+            
+            # Extract cookie for authenticated tests
+            COOKIE_LINE=$(echo "$LOGIN_RESPONSE" | grep -i "set-cookie:" | head -1)
+            COOKIE=$(echo "$COOKIE_LINE" | sed 's/.*set-cookie: *\([^;]*\).*/\1/i')
+            
+            # Me authenticated probe
+            echo "Testing me authenticated probe..."
+            ME_AUTH_RESPONSE=$(curl -s -w "%{http_code}:%{content_type}" \
+              -H "Cookie: $COOKIE" \
+              https://www.glowme.io/api/auth/me)
+            
+            ME_HTTP_CODE=$(echo $ME_AUTH_RESPONSE | cut -d: -f1)
+            ME_CONTENT_TYPE=$(echo $ME_AUTH_RESPONSE | cut -d: -f2)
+            
+            if [ "$ME_HTTP_CODE" != "200" ] || [[ "$ME_CONTENT_TYPE" != *"application/json"* ]]; then
+              echo "❌ Me authenticated probe failed: HTTP $ME_HTTP_CODE, Content-Type: $ME_CONTENT_TYPE"
+              FAILURES=$((FAILURES + 1))
+            else
+              echo "✅ Me authenticated probe passed"
+            fi
+            
+            # Logout probe
+            echo "Testing logout probe..."
+            LOGOUT_RESPONSE=$(curl -s -w "%{http_code}:%{content_type}" \
+              -X POST \
+              -H "Cookie: $COOKIE" \
+              https://www.glowme.io/api/auth/logout)
+            
+            LOGOUT_HTTP_CODE=$(echo $LOGOUT_RESPONSE | cut -d: -f1)
+            LOGOUT_CONTENT_TYPE=$(echo $LOGOUT_RESPONSE | cut -d: -f2)
+            
+            if [ "$LOGOUT_HTTP_CODE" != "200" ] || [[ "$LOGOUT_CONTENT_TYPE" != *"application/json"* ]]; then
+              echo "❌ Logout probe failed: HTTP $LOGOUT_HTTP_CODE, Content-Type: $LOGOUT_CONTENT_TYPE"
+              FAILURES=$((FAILURES + 1))
+            else
+              echo "✅ Logout probe passed"
+            fi
+          fi
+          
+          # Me unauthenticated probe
+          echo "Testing me unauthenticated probe..."
+          ME_UNAUTH_RESPONSE=$(curl -s -w "%{http_code}:%{content_type}" \
+            https://www.glowme.io/api/auth/me)
+          
+          ME_UNAUTH_HTTP_CODE=$(echo $ME_UNAUTH_RESPONSE | cut -d: -f1)
+          ME_UNAUTH_CONTENT_TYPE=$(echo $ME_UNAUTH_RESPONSE | cut -d: -f2)
+          
+          if [ "$ME_UNAUTH_HTTP_CODE" != "401" ] || [[ "$ME_UNAUTH_CONTENT_TYPE" != *"application/json"* ]]; then
+            echo "❌ Me unauthenticated probe failed: HTTP $ME_UNAUTH_HTTP_CODE, Content-Type: $ME_UNAUTH_CONTENT_TYPE"
+            FAILURES=$((FAILURES + 1))
+          else
+            echo "✅ Me unauthenticated probe passed"
+          fi
+          
+          # Summary
+          if [ $FAILURES -eq 0 ]; then
+            echo "🎉 All synthetic monitoring probes passed!"
+          else
+            echo "💥 $FAILURES probe(s) failed - Auth v2 system may be degraded"
+            exit 1
+          fi
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "🚨 ALERT: Auth v2 synthetic monitoring detected failures!"
+          echo "This indicates potential auth system degradation in production."
+          echo "Check the logs above for specific probe failures."
+          echo "Consider triggering rollback procedures if multiple probes are failing."
+
