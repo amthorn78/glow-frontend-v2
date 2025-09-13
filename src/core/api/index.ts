@@ -94,7 +94,12 @@ class ApiClient {
         throw new Error(data.message || data.error || ERROR_MESSAGES.SERVER_ERROR);
       }
 
-      return data;
+      // Return proper ApiResponse format
+      return {
+        success: true,
+        data: data,
+        message: data.message || 'Success'
+      };
     } catch (error) {
       // Retry logic for network errors
       if (retryCount < this.maxRetries && this.isRetryableError(error)) {
@@ -132,12 +137,19 @@ class ApiClient {
   // AUTHENTICATION METHODS
   // ============================================================================
 
-  async login(credentials: LoginCredentials): Promise<ApiResponse<{ user: User; access_token: string; refresh_token: string }>> {
-    const response = await this.post<{ user: User; access_token: string; refresh_token: string }>('/auth/login', credentials);
+  async login(credentials: LoginCredentials): Promise<ApiResponse<{ user: User; token: string }>> {
+    const response = await this.post<{ user: User; token: string; message: string }>('/auth/login', credentials);
     
     if (response.success && response.data) {
-      this.setTokens(response.data.access_token, response.data.refresh_token);
+      // Backend sends "token", not "access_token", and no refresh_token
+      this.setTokens(response.data.token, ''); // No refresh token from backend
       this.setUserData(response.data.user);
+      
+      return {
+        success: true,
+        data: { user: response.data.user, token: response.data.token },
+        message: response.message || 'Login successful'
+      };
     }
     
     return response;
