@@ -1,0 +1,384 @@
+@import "tailwindcss";
+
+/* ============================================================================
+   GLOW DATING APP - TAILWIND SETUP
+   Phase 2: DISSOLUTION - Enhanced Design System
+   ============================================================================ */
+
+/* Tailwind Base Styles */
+@layer base {
+  /* Root CSS Custom Properties for Theme System */
+  :root {
+    /* Light Theme Colors */
+    --color-glow-pink: #ec4899;
+    --color-glow-purple: #8b5cf6;
+    --color-glow-orange: #f97316;
+    --color-glow-rose: #f43f5e;
+    
+    /* Light Theme Background & Surface */
+    --color-bg-primary: #ffffff;
+    --color-bg-secondary: #f8fafc;
+    --color-surface: #ffffff;
+    --color-border: #e2e8f0;
+    
+    /* Light Theme Text */
+    --color-text-primary: #1e293b;
+    --color-text-secondary: #64748b;
+    --color-text-muted: #94a3b8;
+  }
+  
+  /* Dark Theme Colors */
+  .dark {
+    --color-bg-primary: #0f0f23;
+    --color-bg-secondary: #1a1a2e;
+    --color-surface: #16213e;
+    --color-border: #2d3748;
+    
+    --color-text-primary: #f1f5f9;
+    --color-text-secondary: #cbd5e1;
+    --color-text-muted: #94a3b8;
+  }
+  
+  /* Base HTML Styles */
+  html {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  body {
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+  
+  /* Smooth Theme Transitions */
+  * {
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-duration: 0.2s;
+    transition-timing-function: ease;
+  }
+  
+  /* Disable transitions during theme switch to prevent flash */
+  .theme-switching * {
+    transition: none !important;
+  }
+  
+  /* Focus Styles for Accessibility */
+  :focus-visible {
+    outline: 2px solid var(--color-glow-purple);
+    outline-offset: 2px;
+  }
+  
+  /* Reduced Motion Support */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* ============================================================================
+   DATING APP SPECIFIC ANIMATIONS
+   ============================================================================ */
+
+@layer utilities {
+  /* Swipe Animations */
+  @keyframes swipeLeft {
+    to { 
+      transform: translateX(-100%) rotate(-30deg); 
+      opacity: 0; 
+    }
+  }
+  
+  @keyframes swipeRight {
+    to { 
+      transform: translateX(100%) rotate(30deg); 
+      opacity: 0; 
+    }
+  }
+  
+  @keyframes matchCelebration {
+    0%, 100% { 
+      transform: scale(1); 
+    }
+    50% { 
+      transform: scale(1.1); 
+    }
+  }
+  
+  @keyframes heartBeat {
+    0%, 100% { 
+      transform: scale(1); 
+    }
+    50% { 
+      transform: scale(1.05); 
+    }
+  }
+  
+  @keyframes fadeIn {
+    from { 
+      opacity: 0; 
+    }
+    to { 
+      opacity: 1; 
+    }
+  }
+  
+  @keyframes slideUp {
+    from { 
+      transform: translateY(100%); 
+    }
+    to { 
+      transform: translateY(0); 
+    }
+  }
+  
+  @keyframes slideDown {
+    from { 
+      transform: translateY(-100%); 
+    }
+    to { 
+      transform: translateY(0); 
+    }
+  }
+  
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+  
+  /* Animation Classes */
+  .animate-swipe-left {
+    animation: swipeLeft 0.3s ease-out forwards;
+  }
+  
+  .animate-swipe-right {
+    animation: swipeRight 0.3s ease-out forwards;
+  }
+  
+  .animate-match-celebration {
+    animation: matchCelebration 1s ease-out;
+  }
+  
+  .animate-heart-beat {
+    animation: heartBeat 1.5s ease-in-out infinite;
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .animate-slide-down {
+    animation: slideDown 0.3s ease-out;
+  }
+  
+  /* Touch-Friendly Utilities */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Dating App Specific Utilities */
+  .gradient-glow {
+    background: linear-gradient(135deg, var(--color-glow-pink), var(--color-glow-purple));
+  }
+  
+  .gradient-glow-orange {
+    background: linear-gradient(135deg, var(--color-glow-orange), var(--color-glow-rose));
+  }
+  
+  .text-gradient {
+    background: linear-gradient(135deg, var(--color-glow-pink), var(--color-glow-purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  /* Card Styles */
+  .card-glow {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+  
+  .card-glow:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+  
+  /* Button Styles */
+  .btn-primary {
+    background: linear-gradient(135deg, var(--color-glow-pink), var(--color-glow-purple));
+    color: white;
+    border: none;
+    border-radius: 0.75rem;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+  
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 15px -3px rgba(236, 72, 153, 0.3);
+  }
+  
+  .btn-secondary {
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+  
+  .btn-secondary:hover {
+    background: var(--color-bg-secondary);
+    transform: translateY(-1px);
+  }
+}
+
+/* ============================================================================
+   COMPONENT SPECIFIC STYLES
+   ============================================================================ */
+
+@layer components {
+  /* Modal Backdrop */
+  .modal-backdrop {
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+  }
+  
+  /* Modal Container */
+  .modal-container {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 1.5rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  /* Notification Styles */
+  .notification {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .notification.success {
+    border-left: 4px solid #10b981;
+  }
+  
+  .notification.error {
+    border-left: 4px solid #ef4444;
+  }
+  
+  .notification.warning {
+    border-left: 4px solid #f59e0b;
+  }
+  
+  .notification.info {
+    border-left: 4px solid var(--color-glow-purple);
+  }
+  
+  /* Profile Card Styles */
+  .profile-card {
+    background: var(--color-surface);
+    border-radius: 1.5rem;
+    overflow: hidden;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease;
+  }
+  
+  .profile-card:hover {
+    transform: translateY(-4px);
+  }
+  
+  /* Swipe Action Buttons */
+  .swipe-button {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+  
+  .swipe-button:hover {
+    transform: scale(1.1);
+  }
+  
+  .swipe-button.like {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+  }
+  
+  .swipe-button.pass {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+  }
+  
+  .swipe-button.super-like {
+    background: linear-gradient(135deg, var(--color-glow-purple), #7c3aed);
+    color: white;
+  }
+}
+
+/* ============================================================================
+   RESPONSIVE DESIGN ENHANCEMENTS
+   ============================================================================ */
+
+/* Mobile-first responsive utilities */
+@media (max-width: 475px) {
+  .mobile-padding {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  .mobile-text {
+    font-size: 0.875rem;
+  }
+}
+
+/* Tablet and up */
+@media (min-width: 768px) {
+  .desktop-padding {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .high-dpi-border {
+    border-width: 0.5px;
+  }
+}
+
+/* Landscape orientation on mobile */
+@media (orientation: landscape) and (max-height: 600px) {
+  .landscape-compact {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+}
+
