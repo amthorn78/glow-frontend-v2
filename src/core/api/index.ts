@@ -59,13 +59,17 @@ class ApiClient {
       
       const token = this.getAccessToken();
 
+      const headers = new Headers(options.headers || {});
+      if (options.body) {
+        headers.set('Content-Type', 'application/json');
+      }
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+
       const config: RequestInit = {
         ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-          ...options.headers,
-        },
+        headers,
         signal: AbortSignal.timeout(this.timeout),
       };
 
