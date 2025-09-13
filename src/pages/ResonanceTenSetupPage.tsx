@@ -23,17 +23,31 @@ const ResonanceTenSetupPage: React.FC = () => {
   const [dimensions, setDimensions] = useState<ResonanceDimension[]>([]);
 
   // Load Resonance Ten configuration from backend
-  const { data: configData, isLoading: configLoading, error: configError } = useQuery({
+  const { 
+    data: configData, 
+    isLoading: configLoading, 
+    error: configError,
+    refetch: refetchConfig 
+  } = useQuery({
     queryKey: ['resonance-config'],
     queryFn: () => apiClient.getResonanceConfig(),
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 10 * 60 * 1000, // Cache for 10 minutes
+    retry: 2,
+    refetchOnWindowFocus: false,
   });
 
   // Load existing user preferences
-  const { data: prefsData, isLoading: prefsLoading } = useQuery({
+  const { 
+    data: prefsData, 
+    isLoading: prefsLoading,
+    error: prefsError,
+    refetch: refetchPrefs
+  } = useQuery({
     queryKey: ['resonance-prefs'],
     queryFn: () => apiClient.getResonancePrefs(),
     enabled: !!user && !!configData?.data,
+    retry: 2,
+    refetchOnWindowFocus: false,
   });
 
   // Save preferences mutation
@@ -65,14 +79,6 @@ const ResonanceTenSetupPage: React.FC = () => {
       setPhase('welcome');
     }
   }, [configData, prefsData]);
-
-  // Handle configuration loading error
-  useEffect(() => {
-    if (configError) {
-      console.error('Failed to load Resonance Ten configuration:', configError);
-      alert('Failed to load configuration. Please refresh the page.');
-    }
-  }, [configError]);
 
   const handleWeightChange = (key: string, value: number) => {
     setWeights(prev => ({
@@ -137,6 +143,46 @@ const ResonanceTenSetupPage: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  // Handle configuration error
+  if (configError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
+        <div className="max-w-md mx-auto text-center">
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8">
+            <div className="text-red-400 text-6xl mb-4">⚠️</div>
+            <h2 className="text-2xl font-semibold text-white mb-4">Failed to Load Resonance Ten</h2>
+            <p className="text-purple-200 mb-6">
+              We couldn't load the compatibility configuration. This might be a temporary issue.
+            </p>
+            <div className="space-y-3">
+              <button 
+                onClick={() => refetchConfig()}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+              >
+                Try Again
+              </button>
+              <button 
+                onClick={() => navigate('/discovery')}
+                className="w-full bg-white/20 hover:bg-white/30 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+              >
+                Skip for Now
+              </button>
+            </div>
+            <p className="mt-4 text-sm text-purple-300">
+              If this continues, please contact support or check your internet connection.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle preferences error (less critical)
+  if (prefsError) {
+    console.warn('Failed to load existing preferences:', prefsError);
+    // Continue with default preferences
   }
 
   if (phase === 'welcome') {
