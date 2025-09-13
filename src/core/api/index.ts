@@ -154,16 +154,26 @@ class ApiClient {
   // ============================================================================
 
   async login(credentials: LoginCredentials): Promise<ApiResponse<{ user: User; token: string }>> {
-    const response = await this.post<{ user: User; token: string; message: string }>('/api/auth/login', credentials);
+    const response = await this.post<{ id: number; email: string; token: string; message: string }>('/api/auth/login', credentials);
     
     if (response.success && response.data) {
-      // Backend sends "token", not "access_token", and no refresh_token
+      // Backend returns user fields directly: {id, email, token, message}
+      // Create user object from the direct fields
+      const user: User = {
+        id: response.data.id.toString(), // Convert number to string to match User type
+        email: response.data.email,
+        status: 'active', // Default status
+        is_admin: false, // Default admin status
+        created_at: new Date().toISOString(), // Default timestamp
+        updated_at: new Date().toISOString(), // Default timestamp
+      };
+      
       this.setTokens(response.data.token, ''); // No refresh token from backend
-      this.setUserData(response.data.user);
+      this.setUserData(user);
       
       return {
         success: true,
-        data: { user: response.data.user, token: response.data.token },
+        data: { user: user, token: response.data.token },
         message: response.message || 'Login successful'
       };
     }
