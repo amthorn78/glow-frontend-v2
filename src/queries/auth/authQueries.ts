@@ -26,6 +26,7 @@ export const authQueryKeys = {
 
 /**
  * Current user query - Auth v2 single source of truth via /api/auth/me
+ * Non-throwing: treats 401 as valid "unauthenticated" state
  */
 export const useCurrentUser = () => {
   const authStore = useAuthStore();
@@ -35,24 +36,21 @@ export const useCurrentUser = () => {
     queryFn: async () => {
       const response = await apiClient.getCurrentUser();
       
-      if (response.data.ok && response.data.user) {
-        // Update store with fresh user data
+      // Always resolves - never throws
+      if (response.data.auth === 'authenticated' && response.data.user) {
+        // Update store with authenticated user
         authStore.setUser(response.data.user);
-        return response.data.user;
+        return { auth: 'authenticated', user: response.data.user };
       } else {
-        // Clear store on auth failure
+        // Clear store for unauthenticated state
         authStore.logout();
-        throw new Error(response.data.error || 'Authentication failed');
+        return { auth: 'unauthenticated', user: null };
       }
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    retry: (failureCount, error: any) => {
-      // Don't retry on 401 (auth required)
-      if (error?.status === 401) return false;
-      return failureCount < 2;
-    },
-    refetchOnWindowFocus: true,
+    retry: false, // Never retry - first result is terminal
+    refetchOnWindowFocus: false, // Prevent background churn
+    staleTime: 60 * 1000, // 60 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
     refetchOnMount: true,
   });
 };

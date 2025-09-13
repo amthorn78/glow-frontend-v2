@@ -41,16 +41,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const authStore = useAuthStore();
   
-  // Bootstrap authentication via /me endpoint
+  // Bootstrap authentication via /me endpoint (non-throwing)
   const { 
-    data: user, 
+    data: authResult, 
     isLoading, 
     error,
     isSuccess,
     isError 
   } = useCurrentUser();
 
-  // Handle initialization
+  // Handle initialization - set to true on ANY resolution
   useEffect(() => {
     if (isSuccess || isError) {
       setIsInitialized(true);
@@ -58,14 +58,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [isSuccess, isError, authStore]);
 
-  // Handle authentication state
+  // Handle authentication state from resolved result
   useEffect(() => {
-    if (isSuccess && user) {
-      authStore.setUser(user);
+    if (isSuccess && authResult) {
+      if (authResult.auth === 'authenticated' && authResult.user) {
+        authStore.setUser(authResult.user);
+      } else {
+        authStore.logout();
+      }
     } else if (isError) {
+      // Fallback: treat query errors as unauthenticated
       authStore.logout();
     }
-  }, [isSuccess, isError, user, authStore]);
+  }, [isSuccess, isError, authResult, authStore]);
 
   const contextValue: AuthContextType = {
     isInitialized,

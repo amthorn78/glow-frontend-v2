@@ -110,8 +110,8 @@ class ApiClient {
 
       console.log(`[TRACE] fetch ← ${response.status} ${url} {ct: ${contentType}, preview: ${JSON.stringify(data).substring(0, 100)}}`);
 
-      // Global 401 handler for JSON responses
-      if (response.status === 401) {
+      // Global 401 handler for JSON responses (exclude /me endpoint)
+      if (response.status === 401 && !url.includes('/api/auth/me')) {
         this.handleUnauthorized();
         throw new Error(data.error || 'Authentication required');
       }
@@ -229,9 +229,67 @@ class ApiClient {
     return response;
   }
 
-  async getCurrentUser(): Promise<ApiResponse<{ ok: boolean; user?: User; error?: string; code?: string }>> {
-    const response = await this.get<{ ok: boolean; user?: User; error?: string; code?: string }>('/api/auth/me');
-    return response;
+  async getCurrentUser(): Promise<ApiResponse<{ auth: 'authenticated' | 'unauthenticated'; user?: User; error?: string; code?: string }>> {
+    try {
+      // Special handling for /me endpoint - don't throw on 401
+      const url = '/api/auth/me';
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+      const config: RequestInit = {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        credentials: 'same-origin',
+        signal: controller.signal,
+      };
+
+      console.log(`[TRACE] fetch → GET ${url}`);
+      const response = await fetch(url, config);
+      clearTimeout(timeoutId);
+
+      // Parse JSON response
+      const contentType = response.headers.get('content-type');
+      const isJson = contentType && contentType.includes('application/json');
+
+      if (!isJson) {
+        throw new Error(`Server returned non-JSON response: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log(`[TRACE] fetch ← ${response.status} ${url} {ct: ${contentType}, preview: ${JSON.stringify(data).substring(0, 100)}}`);
+
+      // Special handling for /me endpoint
+      if (response.status === 200 && data.ok && data.user) {
+        // Authenticated state
+        return {
+          data: { auth: 'authenticated', user: data.user },
+          status: response.status,
+          headers: response.headers,
+          ok: true,
+        };
+      } else if (response.status === 401 && data.code === 'AUTH_REQUIRED') {
+        // Unauthenticated state - this is valid, not an error
+        return {
+          data: { auth: 'unauthenticated', user: null, error: data.error, code: data.code },
+          status: 200, // Treat as success for query purposes
+          headers: response.headers,
+          ok: true,
+        };
+      } else {
+        // Other errors
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout');
+      }
+      throw error;
+    }
   }
 
   // ============================================================================
