@@ -224,6 +224,22 @@ class ApiClient {
   }
 
   // ============================================================================
+  // RESONANCE TEN METHODS
+  // ============================================================================
+
+  async getResonanceConfig(): Promise<ApiResponse<any>> {
+    return this.get<any>('/config/resonance');
+  }
+
+  async getResonancePrefs(): Promise<ApiResponse<any>> {
+    return this.get<any>('/me/resonance');
+  }
+
+  async updateResonancePrefs(prefs: any): Promise<ApiResponse<{ ok: boolean }>> {
+    return this.put<{ ok: boolean }>('/me/resonance', prefs);
+  }
+
+  // ============================================================================
   // DISCOVERY & MATCHING METHODS
   // ============================================================================
 
@@ -413,6 +429,11 @@ export const {
   saveBirthData,
   updateBirthData,
   deleteBirthData,
+  
+  // Resonance Ten
+  getResonanceConfig,
+  getResonancePrefs,
+  updateResonancePrefs,
   
   // Discovery & Matching
   getDiscoveryProfiles,

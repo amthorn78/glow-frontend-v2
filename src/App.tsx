@@ -17,6 +17,7 @@ import EnhancedBirthDataPage from './pages/EnhancedBirthDataPage';
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
 import Magic10SetupPage from './pages/Magic10SetupPage';
+import ResonanceTenSetupPage from './pages/ResonanceTenSetupPage';
 import DiscoveryPage from './pages/DiscoveryPage';
 
 // Components
@@ -88,6 +89,14 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Magic10SetupPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/resonance-setup" 
+                element={
+                  <ProtectedRoute>
+                    <ResonanceTenSetupPage />
                   </ProtectedRoute>
                 } 
               />
