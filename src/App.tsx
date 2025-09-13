@@ -19,6 +19,10 @@ import ProfilePage from './pages/ProfilePage';
 import Magic10SetupPage from './pages/Magic10SetupPage';
 import DiscoveryPage from './pages/DiscoveryPage';
 
+// Components
+import { ModalRoot } from './components/modals';
+import ThemeTestComponent from './components/ThemeTestComponent';
+
 import './App.css';
 
 // ============================================================================
@@ -50,6 +54,13 @@ const App: React.FC = () => {
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              <Route path="/theme-test" element={
+                <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+                  <ThemeTestComponent />
+                </div>
+              } />
+              
+              {/* Birth Data Routes */}
               <Route path="/birth-data" element={<BirthDataPage />} />
               <Route path="/birth-data-enhanced" element={<EnhancedBirthDataPage />} />
               <Route path="/birth-data-comparison" element={<BirthDataComparisonPage />} />
@@ -91,6 +102,9 @@ const App: React.FC = () => {
               {/* Redirect unknown routes to landing */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            
+            {/* Global Modal System */}
+            <ModalRoot />
           </div>
         </Router>
       </AuthProvider>
