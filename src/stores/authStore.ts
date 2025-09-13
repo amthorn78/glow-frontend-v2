@@ -173,26 +173,80 @@ export const useAuthStore = create<AuthStore>()(
         name: 'glow-auth-store',
         
         // Selective persistence - only persist important data
-        partialize: (state) => ({
-          user: state.user,
-          token: state.token,
-          refreshToken: state.refreshToken,
-          isAuthenticated: state.isAuthenticated,
-        }),
+        partialize: (state) => {
+          // Ensure partialize always returns a valid object
+          try {
+            return {
+              user: state.user,
+              token: state.token,
+              refreshToken: state.refreshToken,
+              isAuthenticated: state.isAuthenticated,
+            };
+          } catch (error) {
+            console.warn('AuthStore partialize error, returning empty state:', error);
+            return {
+              user: null,
+              token: null,
+              refreshToken: null,
+              isAuthenticated: false,
+            };
+          }
+        },
         
         // Version for migration handling
         version: 1,
         
         // Migration function for future updates
         migrate: (persistedState: any, version: number) => {
-          if (version === 0) {
-            // Migration from version 0 to 1
-            return {
-              ...persistedState,
-              isInitialized: false,
-            };
+          try {
+            if (version === 0) {
+              // Migration from version 0 to 1
+              return {
+                ...persistedState,
+                isInitialized: false,
+              };
+            }
+            return persistedState;
+          } catch (error) {
+            console.warn('AuthStore migration error, falling back to initial state:', error);
+            return initialState;
           }
-          return persistedState;
+        },
+        
+        // Defensive deserialization to handle corrupted localStorage
+        deserialize: (str: string) => {
+          try {
+            // Handle empty or invalid strings
+            if (!str || str.trim() === '' || str === 'undefined' || str === 'null') {
+              console.warn('AuthStore: Empty or invalid persisted value, using initial state');
+              return { state: initialState, version: 1 };
+            }
+            
+            const parsed = JSON.parse(str);
+            
+            // Validate the parsed object structure
+            if (!parsed || typeof parsed !== 'object') {
+              console.warn('AuthStore: Invalid persisted object structure, using initial state');
+              return { state: initialState, version: 1 };
+            }
+            
+            // Ensure state exists and is an object
+            if (!parsed.state || typeof parsed.state !== 'object') {
+              console.warn('AuthStore: Invalid state in persisted data, using initial state');
+              return { state: initialState, version: 1 };
+            }
+            
+            return parsed;
+          } catch (error) {
+            console.warn('AuthStore: JSON parse error, falling back to initial state:', error);
+            // Clear the corrupted value
+            try {
+              localStorage.removeItem('glow-auth-store');
+            } catch (clearError) {
+              console.warn('AuthStore: Could not clear corrupted localStorage:', clearError);
+            }
+            return { state: initialState, version: 1 };
+          }
         },
       }
     ),
