@@ -4,7 +4,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useMagic10Store } from '../stores/magic10Store';
 import { useUserBirthData } from '../queries/auth/authQueries';
 import Magic10SimpleDisplay from '../components/Magic10SimpleDisplay';
-import BirthDataForm from '../components/BirthDataForm';
+import StructuredBirthDataForm from '../components/StructuredBirthDataForm';
 import apiClient from '../core/api';
 
 const ProfilePage: React.FC = () => {
@@ -293,30 +293,18 @@ const ProfilePage: React.FC = () => {
           </div>
 
           {editingSection === 'birth' ? (
-            <BirthDataForm 
+            <StructuredBirthDataForm 
               initialData={birthData}
               onSubmit={async (formData) => {
-                // Convert form data to API format - wrap in birth_data object
-                const birthDataPayload = {
-                  birth_data: {
-                    birth_date: `${formData.year}-${formData.month.padStart(2, '0')}-${formData.day.padStart(2, '0')}`,
-                    birth_time: `${formData.hours.padStart(2, '0')}:${formData.minutes.padStart(2, '0')}`,
-                    birth_location: formData.location,
-                    latitude: formData.coordinates?.lat,
-                    longitude: formData.coordinates?.lng
-                  }
-                };
-                
-                const response = await apiClient.updateBirthData(birthDataPayload);
+                // Send structured data directly to API (new format)
+                const response = await apiClient.updateBirthData(formData);
                 if (!response.success) {
                   throw new Error(response.message || 'Failed to save birth data');
                 }
               }}
-              onSuccess={() => {
-                setEditingSection(null);
-                setMessage({ type: 'success', text: 'Birth data updated successfully!' });
-              }}
               onCancel={() => setEditingSection(null)}
+              submitButtonText="Save Birth Data"
+              showCancelButton={true}
             />
           ) : (
             <div className="space-y-3">

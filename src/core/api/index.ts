@@ -203,8 +203,15 @@ class ApiClient {
     return this.post<BirthData>('/birth-data', birthData);
   }
 
-  async updateBirthData(birthData: Partial<BirthDataForm>): Promise<ApiResponse<BirthData>> {
-    return this.post<BirthData>('/profile/update-birth-data', birthData);
+  async updateBirthData(birthData: any): Promise<ApiResponse<BirthData>> {
+    // Handle both structured format (new) and legacy format
+    if (typeof birthData === 'object' && 'year' in birthData) {
+      // New structured format - send directly
+      return this.post<BirthData>('/profile/update-birth-data', birthData);
+    } else {
+      // Legacy format - wrap in birth_data object
+      return this.post<BirthData>('/profile/update-birth-data', birthData);
+    }
   }
 
   async deleteBirthData(): Promise<ApiResponse<void>> {
