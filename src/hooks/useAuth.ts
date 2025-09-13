@@ -37,16 +37,12 @@ const useAuth = () => {
     isLoading: storeLoading,
     error: storeError,
     canLogin,
-    remainingAttempts,
-    lockTimeRemaining,
   } = useAuthStore((state) => ({
     isAuthenticated: authSelectors.isAuthenticated(state),
     user: authSelectors.user(state),
     isLoading: authSelectors.isLoading(state),
     error: authSelectors.error(state),
     canLogin: authSelectors.canLogin(state),
-    remainingAttempts: authSelectors.remainingAttempts(state),
-    lockTimeRemaining: authSelectors.lockTimeRemaining(state),
   }));
 
   // ========================================================================
@@ -84,11 +80,6 @@ const useAuth = () => {
    * Login with credentials
    */
   const login = useCallback(async (credentials: LoginCredentials) => {
-    if (!canLogin) {
-      const minutes = Math.ceil(lockTimeRemaining / 60000);
-      throw new Error(`Account locked. Try again in ${minutes} minutes.`);
-    }
-
     try {
       const result = await loginMutation.mutateAsync(credentials);
       return result;
@@ -96,7 +87,7 @@ const useAuth = () => {
       console.error('Login failed:', error);
       throw error;
     }
-  }, [loginMutation, canLogin, lockTimeRemaining]);
+  }, [loginMutation]);
 
   /**
    * Register new user
@@ -197,13 +188,6 @@ const useAuth = () => {
   }, [authStore]);
 
   /**
-   * Reset login attempts (admin function)
-   */
-  const resetLoginAttempts = useCallback(() => {
-    authStore.resetLoginAttempts();
-  }, [authStore]);
-
-  /**
    * Check if user has specific permission
    */
   const hasPermission = useCallback((permission: string): boolean => {
@@ -260,19 +244,6 @@ const useAuth = () => {
     }
   }, [isAuthenticated, authStore.token, refreshToken]);
 
-  /**
-   * Handle account lock countdown
-   */
-  useEffect(() => {
-    if (lockTimeRemaining > 0) {
-      const interval = setInterval(() => {
-        authStore.checkAccountLock();
-      }, 1000);
-
-      return () => clearInterval(interval);
-    }
-  }, [lockTimeRemaining, authStore]);
-
   // ========================================================================
   // RETURN OBJECT
   // ========================================================================
@@ -295,9 +266,6 @@ const useAuth = () => {
     
     // Security state
     canLogin,
-    remainingAttempts,
-    lockTimeRemaining: Math.max(0, lockTimeRemaining),
-    isLocked: lockTimeRemaining > 0,
     
     // Loading states for specific operations
     isLoggingIn: loginMutation.isPending,
@@ -332,7 +300,6 @@ const useAuth = () => {
     
     // Utility functions
     clearError,
-    resetLoginAttempts,
     hasPermission,
     getDisplayName,
     refreshToken,

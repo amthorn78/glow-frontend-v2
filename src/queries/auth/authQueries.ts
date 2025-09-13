@@ -26,19 +26,10 @@ const useLoginMutation = () => {
 
   return useMutation({
     mutationFn: async (credentials: LoginCredentials): Promise<AuthResponse> => {
-      // Check account lock before attempting login
-      if (authStore.checkAccountLock()) {
-        const lockTime = authStore.lockUntil;
-        const remainingTime = lockTime ? Math.ceil((lockTime - Date.now()) / 60000) : 0;
-        throw new Error(`Account locked. Try again in ${remainingTime} minutes.`);
-      }
-
       try {
         const response = await apiClient.login(credentials);
         return response;
       } catch (error) {
-        // Increment login attempts on failure
-        authStore.incrementLoginAttempts();
         throw error;
       }
     },
@@ -54,9 +45,6 @@ const useLoginMutation = () => {
     onSuccess: (data, variables) => {
       // Update auth store with successful login
       authStore.login(data.user, data.token, data.refreshToken);
-      
-      // Reset login attempts on success
-      authStore.resetLoginAttempts();
 
       // Invalidate and refetch user-related queries
       invalidateQueries.auth();

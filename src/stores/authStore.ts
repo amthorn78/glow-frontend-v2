@@ -21,12 +21,6 @@ export interface AuthState {
   isLoading: boolean;
   error: string | null;
   isInitialized: boolean;
-  
-  // Login attempt tracking
-  loginAttempts: number;
-  lastLoginAttempt: number | null;
-  isLocked: boolean;
-  lockUntil: number | null;
 }
 
 export interface AuthActions {
@@ -39,12 +33,6 @@ export interface AuthActions {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setInitialized: (initialized: boolean) => void;
-  
-  // Security actions
-  incrementLoginAttempts: () => void;
-  resetLoginAttempts: () => void;
-  lockAccount: (duration: number) => void;
-  checkAccountLock: () => boolean;
   
   // Complete actions
   login: (user: User, token: string, refreshToken: string) => void;
@@ -72,20 +60,7 @@ const initialState: AuthState = {
   isLoading: false,
   error: null,
   isInitialized: false,
-  
-  // Security
-  loginAttempts: 0,
-  lastLoginAttempt: null,
-  isLocked: false,
-  lockUntil: null,
 };
-
-// ============================================================================
-// CONSTANTS
-// ============================================================================
-
-const MAX_LOGIN_ATTEMPTS = 5;
-const LOCK_DURATION = 15 * 60 * 1000; // 15 minutes
 
 // ============================================================================
 // STORE IMPLEMENTATION
@@ -147,58 +122,6 @@ export const useAuthStore = create<AuthStore>()(
         },
         
         // ========================================================================
-        // SECURITY ACTIONS
-        // ========================================================================
-        
-        incrementLoginAttempts: () => {
-          set((state) => {
-            state.loginAttempts += 1;
-            state.lastLoginAttempt = Date.now();
-            
-            // Lock account if too many attempts
-            if (state.loginAttempts >= MAX_LOGIN_ATTEMPTS) {
-              state.isLocked = true;
-              state.lockUntil = Date.now() + LOCK_DURATION;
-            }
-          });
-        },
-        
-        resetLoginAttempts: () => {
-          set((state) => {
-            state.loginAttempts = 0;
-            state.lastLoginAttempt = null;
-            state.isLocked = false;
-            state.lockUntil = null;
-          });
-        },
-        
-        lockAccount: (duration) => {
-          set((state) => {
-            state.isLocked = true;
-            state.lockUntil = Date.now() + duration;
-          });
-        },
-        
-        checkAccountLock: () => {
-          const state = get();
-          
-          if (state.isLocked && state.lockUntil) {
-            if (Date.now() > state.lockUntil) {
-              // Lock expired, reset
-              set((draft) => {
-                draft.isLocked = false;
-                draft.lockUntil = null;
-                draft.loginAttempts = 0;
-              });
-              return false;
-            }
-            return true;
-          }
-          
-          return false;
-        },
-        
-        // ========================================================================
         // COMPLETE ACTIONS
         // ========================================================================
         
@@ -213,12 +136,6 @@ export const useAuthStore = create<AuthStore>()(
             // Clear UI state
             state.isLoading = false;
             state.error = null;
-            
-            // Reset security state
-            state.loginAttempts = 0;
-            state.lastLoginAttempt = null;
-            state.isLocked = false;
-            state.lockUntil = null;
           });
         },
         
@@ -233,9 +150,6 @@ export const useAuthStore = create<AuthStore>()(
             // Clear UI state
             state.isLoading = false;
             state.error = null;
-            
-            // Keep security state for protection
-            // Don't reset login attempts on logout
           });
         },
         
@@ -264,10 +178,6 @@ export const useAuthStore = create<AuthStore>()(
           token: state.token,
           refreshToken: state.refreshToken,
           isAuthenticated: state.isAuthenticated,
-          loginAttempts: state.loginAttempts,
-          lastLoginAttempt: state.lastLoginAttempt,
-          isLocked: state.isLocked,
-          lockUntil: state.lockUntil,
         }),
         
         // Version for migration handling
@@ -308,14 +218,7 @@ export const authSelectors = {
   // Computed selectors
   isLoggedIn: (state: AuthStore) => state.isAuthenticated && !!state.user,
   hasToken: (state: AuthStore) => !!state.token,
-  canLogin: (state: AuthStore) => !state.isLocked && !state.isLoading,
-  
-  // Security selectors
-  remainingAttempts: (state: AuthStore) => Math.max(0, MAX_LOGIN_ATTEMPTS - state.loginAttempts),
-  lockTimeRemaining: (state: AuthStore) => {
-    if (!state.isLocked || !state.lockUntil) return 0;
-    return Math.max(0, state.lockUntil - Date.now());
-  },
+  canLogin: (state: AuthStore) => !state.isLoading,
   
   // User info selectors
   userName: (state: AuthStore) => state.user?.firstName || state.user?.username || 'User',
@@ -373,6 +276,5 @@ export const getUserDisplayName = (user: User | null): string => {
 // ============================================================================
 
 export default useAuthStore;
-export { MAX_LOGIN_ATTEMPTS, LOCK_DURATION };
 export type { AuthState, AuthActions };
 
