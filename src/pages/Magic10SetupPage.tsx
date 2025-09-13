@@ -290,8 +290,8 @@ const Magic10SetupPageEnhanced: React.FC = () => {
       <div className="max-w-lg mx-auto pt-8">
         {/* Header */}
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-pink-600 mb-1">Magic 10 Setup</h1>
-          <p className="text-sm text-gray-600">Setting your connection priorities</p>
+          <h1 className="text-2xl font-bold text-pink-600 mb-1">Human Design Compatibility</h1>
+          <p className="text-sm text-gray-600">Setting your connection priorities with HD intelligence</p>
         </div>
 
         {/* Progress Bar */}
