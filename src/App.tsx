@@ -21,6 +21,7 @@ import DiscoveryPage from './pages/DiscoveryPage';
 
 // Components
 import { ModalRoot } from './components/modals';
+import { NotificationContainer } from './components/notifications';
 import ThemeTestComponent from './components/ThemeTestComponent';
 
 import './App.css';
@@ -105,6 +106,9 @@ const App: React.FC = () => {
             
             {/* Global Modal System */}
             <ModalRoot />
+            
+            {/* Global Notification System */}
+            <NotificationContainer />
           </div>
         </Router>
       </AuthProvider>
