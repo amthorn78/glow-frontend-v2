@@ -35,11 +35,16 @@ const ResonanceTenSetupPage: React.FC = () => {
     error: configError,
     refetch: refetchConfig 
   } = useQuery({
-    queryKey: ['resonance-config'],
-    queryFn: () => apiClient.getResonanceConfig(),
-    staleTime: 10 * 60 * 1000, // Cache for 10 minutes
-    retry: 2,
+    queryKey: ['r10-config'],
+    queryFn: async () => {
+      const r = await fetch('/api/config/resonance', { credentials: 'include' });
+      const text = await r.text();
+      if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}\n${text.slice(0,300)}`);
+      try { return JSON.parse(text); } catch { throw new Error(`Bad JSON\n${text.slice(0,300)}`); }
+    },
+    retry: 1,
     refetchOnWindowFocus: false,
+    staleTime: 10 * 60 * 1000,
   });
 
   // Load existing user preferences
@@ -159,9 +164,8 @@ const ResonanceTenSetupPage: React.FC = () => {
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8">
             <div className="text-red-400 text-6xl mb-4">⚠️</div>
             <h2 className="text-2xl font-semibold text-white mb-4">Failed to Load Resonance Ten</h2>
-            <p className="text-purple-200 mb-6">
-              We couldn't load the compatibility configuration. This might be a temporary issue.
-            </p>
+            <p className="text-rose-600 font-medium mb-4">Failed to load Resonance Ten.</p>
+            <pre className="text-xs mt-2 whitespace-pre-wrap text-left bg-black/20 p-3 rounded text-purple-200 mb-6">{String(configError)}</pre>
             <div className="space-y-3">
               <button 
                 onClick={() => refetchConfig()}

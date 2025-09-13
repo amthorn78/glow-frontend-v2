@@ -10,8 +10,46 @@
     <meta name="apple-mobile-web-app-title" content="GLOW" />
     <meta name="description" content="Find your perfect match through Human Design compatibility" />
     <title>GLOW - Human Design Dating</title>
-    <script type="module" crossorigin src="/assets/index-bwrEMcMg.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CGYhjC1e.css">
+    
+    <!-- Theme Bootstrap Script - Prevents FOUC -->
+    <script>
+      (function() {
+        // Get stored theme preference or default to 'auto'
+        const storedTheme = localStorage.getItem('ui-store');
+        let theme = 'auto';
+        
+        if (storedTheme) {
+          try {
+            const parsed = JSON.parse(storedTheme);
+            theme = parsed.state?.theme || 'auto';
+          } catch (e) {
+            // Ignore parsing errors, use default
+          }
+        }
+        
+        // Apply theme class immediately
+        const root = document.documentElement;
+        if (theme === 'dark') {
+          root.classList.add('dark');
+        } else if (theme === 'light') {
+          root.classList.remove('dark');
+        } else {
+          // Auto theme - check system preference
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          root.classList.toggle('dark', prefersDark);
+        }
+        
+        // Add theme-switching class to prevent transitions during initial load
+        root.classList.add('theme-switching');
+        
+        // Remove theme-switching class after a brief delay
+        setTimeout(() => {
+          root.classList.remove('theme-switching');
+        }, 100);
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-rrEhB2xW.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DTfgxRX3.css">
   </head>
   <body>
     <div id="root"></div>
