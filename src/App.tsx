@@ -88,6 +88,14 @@ const App: React.FC = () => {
                 path="/magic10-setup" 
                 element={
                   <ProtectedRoute>
+                    <ResonanceTenSetupPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/magic10-setup-legacy" 
+                element={
+                  <ProtectedRoute>
                     <Magic10SetupPage />
                   </ProtectedRoute>
                 } 
