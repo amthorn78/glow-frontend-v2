@@ -66,29 +66,95 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
     }
   }, [currentUser]);
 
-  // Common IANA timezones for dropdown
-  const commonTimezones = [
-    'America/New_York',
-    'America/Chicago', 
-    'America/Denver',
-    'America/Los_Angeles',
-    'America/Phoenix',
-    'America/Anchorage',
-    'Pacific/Honolulu',
-    'Europe/London',
-    'Europe/Paris',
-    'Europe/Berlin',
-    'Europe/Rome',
-    'Europe/Madrid',
-    'Europe/Amsterdam',
-    'Asia/Tokyo',
-    'Asia/Shanghai',
-    'Asia/Kolkata',
-    'Asia/Dubai',
-    'Australia/Sydney',
-    'Australia/Melbourne',
-    'Pacific/Auckland'
-  ];
+  // Get comprehensive IANA timezone list
+  const getTimezoneList = (): string[] => {
+    try {
+      // Modern browsers: use runtime IANA list
+      if ('supportedValuesOf' in Intl) {
+        return (Intl as any).supportedValuesOf('timeZone');
+      }
+    } catch (error) {
+      console.warn('Intl.supportedValuesOf not available, using fallback list');
+    }
+    
+    // Fallback: comprehensive IANA timezone list
+    return [
+      'UTC',
+      'America/New_York',
+      'America/Chicago', 
+      'America/Denver',
+      'America/Los_Angeles',
+      'America/Phoenix',
+      'America/Anchorage',
+      'Pacific/Honolulu',
+      'America/Toronto',
+      'America/Vancouver',
+      'America/Montreal',
+      'America/Halifax',
+      'America/Mexico_City',
+      'America/Sao_Paulo',
+      'America/Buenos_Aires',
+      'America/Lima',
+      'America/Bogota',
+      'America/Caracas',
+      'Europe/London',
+      'Europe/Paris',
+      'Europe/Berlin',
+      'Europe/Rome',
+      'Europe/Madrid',
+      'Europe/Amsterdam',
+      'Europe/Brussels',
+      'Europe/Vienna',
+      'Europe/Zurich',
+      'Europe/Stockholm',
+      'Europe/Oslo',
+      'Europe/Copenhagen',
+      'Europe/Helsinki',
+      'Europe/Warsaw',
+      'Europe/Prague',
+      'Europe/Budapest',
+      'Europe/Bucharest',
+      'Europe/Athens',
+      'Europe/Istanbul',
+      'Europe/Moscow',
+      'Europe/Kiev',
+      'Asia/Tokyo',
+      'Asia/Seoul',
+      'Asia/Shanghai',
+      'Asia/Hong_Kong',
+      'Asia/Singapore',
+      'Asia/Bangkok',
+      'Asia/Jakarta',
+      'Asia/Manila',
+      'Asia/Kuala_Lumpur',
+      'Asia/Taipei',
+      'Asia/Mumbai',
+      'Asia/Kolkata',
+      'Asia/Delhi',
+      'Asia/Karachi',
+      'Asia/Dhaka',
+      'Asia/Dubai',
+      'Asia/Riyadh',
+      'Asia/Tehran',
+      'Asia/Baghdad',
+      'Asia/Jerusalem',
+      'Africa/Cairo',
+      'Africa/Lagos',
+      'Africa/Nairobi',
+      'Africa/Johannesburg',
+      'Africa/Casablanca',
+      'Australia/Sydney',
+      'Australia/Melbourne',
+      'Australia/Brisbane',
+      'Australia/Perth',
+      'Australia/Adelaide',
+      'Pacific/Auckland',
+      'Pacific/Fiji',
+      'Pacific/Tahiti'
+    ];
+  };
+
+  const timezoneList = getTimezoneList();
 
   // Location search with debouncing (OpenStreetMap geocoding)
   useEffect(() => {
@@ -346,8 +412,10 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
             disabled={isSubmitting}
           >
             <option value="">Select timezone...</option>
-            {commonTimezones.map(tz => (
-              <option key={tz} value={tz}>{tz}</option>
+            {timezoneList.map(tz => (
+              <option key={tz} value={tz}>
+                {tz.replace(/_/g, ' ')} {/* Make timezone names more readable */}
+              </option>
             ))}
           </select>
           {errors.timezone && <p className="text-red-500 text-xs mt-1">{errors.timezone}</p>}

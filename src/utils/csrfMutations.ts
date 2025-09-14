@@ -218,3 +218,10 @@ export async function updateBirthDataWithCsrf(birthData: any): Promise<MutationR
   return mutateWithCsrf('PUT', '/api/profile/birth-data', birthData);
 }
 
+/**
+ * Convenience wrapper for basic profile info mutations
+ */
+export async function updateBasicInfoWithCsrf(profileData: any): Promise<MutationResponse> {
+  return mutateWithCsrf('PUT', '/api/profile/basic', profileData);
+}
+

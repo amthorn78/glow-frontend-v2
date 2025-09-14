@@ -6,9 +6,12 @@ import { useUserBirthData } from '../queries/auth/authQueries';
 import Magic10SimpleDisplay from '../components/Magic10SimpleDisplay';
 import BirthDataFormCanonical from '../components/BirthDataFormCanonical';
 import apiClient from '../core/api';
+import { updateBasicInfoWithCsrf } from '../utils/csrfMutations';
+import { useQueryClient } from '@tanstack/react-query';
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, isAuthenticated } = useAuthStore();
   const { priorities } = useMagic10Store();
   const { data: birthData } = useUserBirthData(user?.id?.toString() || '', !!user?.id);
@@ -62,17 +65,37 @@ const ProfilePage: React.FC = () => {
     setMessage(null);
 
     try {
-      const response = await apiClient.updateProfile(formData);
-      if (response.success) {
+      // Prepare basic info payload (exclude email - that's handled separately)
+      const basicInfoPayload = {
+        display_name: formData.display_name || null,
+        first_name: formData.first_name || null,
+        last_name: formData.last_name || null,
+        bio: formData.bio || null,
+        age: formData.age || null,
+        avatar_url: formData.avatar_url || null
+      };
+
+      // Save via centralized CSRF wrapper
+      const response = await updateBasicInfoWithCsrf(basicInfoPayload);
+      
+      if (response.ok) {
         setMessage({ type: 'success', text: 'Profile updated successfully!' });
         setEditingSection(null);
-        // Update auth store with new user data
-        useAuthStore.getState().setUser({ ...user, ...formData });
+        
+        // Invalidate and refetch /api/auth/me (round-trip guarantee)
+        await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+        await queryClient.refetchQueries({ queryKey: ['auth', 'me'] });
       } else {
-        setMessage({ type: 'error', text: response.message || 'Failed to update profile' });
+        setMessage({ 
+          type: 'error', 
+          text: response.error || 'Failed to update profile' 
+        });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to update profile. Please try again.' });
+      setMessage({ 
+        type: 'error', 
+        text: 'Failed to update profile. Please try again.' 
+      });
     } finally {
       setLoading(false);
     }
@@ -162,7 +185,12 @@ const ProfilePage: React.FC = () => {
               onClick={() => setEditingSection(editingSection === 'basic' ? null : 'basic')}
               className="text-purple-600 hover:text-purple-700 font-medium"
             >
-              {editingSection === 'basic' ? 'Cancel' : 'Edit'}
+              {editingSection === 'basic' ? 'Cancel' : (
+                // Single CTA: "Add" if no complete data, "Edit" if data exists
+                (user?.first_name && user?.last_name && user?.email) 
+                  ? 'Edit' 
+                  : 'Add Basic Info'
+              )}
             </button>
           </div>
 
@@ -288,7 +316,12 @@ const ProfilePage: React.FC = () => {
               onClick={() => setEditingSection(editingSection === 'birth' ? null : 'birth')}
               className="text-purple-600 hover:text-purple-700 font-medium"
             >
-              {editingSection === 'birth' ? 'Cancel' : 'Edit'}
+              {editingSection === 'birth' ? 'Cancel' : (
+                // Single CTA: "Add" if no complete data, "Edit" if data exists
+                (birthData?.date && birthData?.time && birthData?.timezone && birthData?.location) 
+                  ? 'Edit' 
+                  : 'Add Birth Data'
+              )}
             </button>
           </div>
 
