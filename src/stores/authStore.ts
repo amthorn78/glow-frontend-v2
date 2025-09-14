@@ -22,6 +22,9 @@ export interface AuthState {
   
   // Session metadata
   lastChecked: number | null; // Timestamp of last /me check
+  
+  // F4: Persist hydration tracking
+  hasHydrated: boolean;
 }
 
 export interface AuthActions {
@@ -39,6 +42,7 @@ export interface AuthActions {
   // Complete actions
   login: (user: User) => void;
   logout: () => void;
+  clearAuth: () => void; // F4: Clear auth without full logout
   updateUser: (updates: Partial<User>) => void;
   
   // Utility actions
@@ -63,6 +67,9 @@ const initialState: AuthState = {
   
   // Session metadata
   lastChecked: null,
+  
+  // F4: Persist hydration tracking
+  hasHydrated: false,
 };
 
 // ============================================================================
@@ -151,6 +158,19 @@ export const useAuthStore = create<AuthStore>()(
           });
         },
         
+        // F4: Clear auth state without full logout (for 401 handling)
+        clearAuth: () => {
+          set((state) => {
+            // Clear authentication data only
+            state.user = null;
+            state.isAuthenticated = false;
+            state.lastChecked = null;
+            
+            // Keep UI state intact (don't clear isInitialized)
+            state.error = null;
+          });
+        },
+        
         updateUser: (updates) => {
           set((state) => {
             if (state.user) {
@@ -169,6 +189,13 @@ export const useAuthStore = create<AuthStore>()(
       })),
       {
         name: 'glow-auth-v2-store', // Changed name to avoid old localStorage conflicts
+        
+        // F4: Track hydration completion
+        onRehydrateStorage: () => (state) => {
+          if (state) {
+            state.hasHydrated = true;
+          }
+        },
         
         // Selective persistence - only persist user and UI preferences
         partialize: (state) => {

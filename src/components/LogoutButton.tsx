@@ -1,10 +1,19 @@
-// Enhanced Logout Button - T-UI-001 Phase 5
-// Router navigation with feature flag fallback to hard navigation
+// Enhanced Logout Button - T-UI-001 Phase 5B
+// Hard navigation enforced with auth flags and telemetry
 
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
-import { isRouterNavEnabled, logFeatureFlag } from '../utils/featureFlags';
+import { 
+  isRouterNavEnabled, 
+  isHardNavEnforced,
+  assertHardNavOnly 
+} from '../config/authFlags';
+import {
+  logLogoutRequest,
+  logLogoutSuccess,
+  logHardNavToLogin
+} from '../utils/authTelemetry';
 
 interface LogoutButtonProps {
   className?: string;
@@ -144,6 +153,9 @@ export const LogoutButton: React.FC<LogoutButtonProps> = ({
     // Prevent double-clicks
     if (isLoading) return;
     
+    // F6: Log logout request
+    logLogoutRequest();
+    
     // Check if offline
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       showToast("You're offline. Try again.");
@@ -198,7 +210,7 @@ export const LogoutButton: React.FC<LogoutButtonProps> = ({
       // Success
       clearTimeout(timeoutId);
       const latency = Date.now() - startTime;
-      log('logout_ok', { latency_ms: latency });
+      logLogoutSuccess(latency);
       
       // Broadcast logout to other tabs for cross-tab coherence
       if (typeof window !== 'undefined' && window.BroadcastChannel) {
@@ -211,23 +223,24 @@ export const LogoutButton: React.FC<LogoutButtonProps> = ({
         }
       }
 
-      // Phase 5: Router navigation with feature flag fallback
-      const useRouterNav = isRouterNavEnabled();
-      logFeatureFlag('ROUTER_NAV_ENABLED', 'logout_success');
+      // F6: Enforce hard navigation per auth policy
+      const shouldUseHardNav = isHardNavEnforced() || !isRouterNavEnabled();
       
-      if (useRouterNav) {
+      if (shouldUseHardNav) {
+        // Hard navigation (Phase 5B default)
+        logHardNavToLogin('auth_policy_enforced');
+        window.location.assign('/login');
+      } else {
+        // Router navigation (only if explicitly enabled and not enforced hard)
+        assertHardNavOnly('logout_success');
         try {
           log('auth.logout.seq', { route: 'router' });
           navigate('/login', { replace: true });
         } catch (error) {
           // Fallback to hard navigation if router fails
-          log('auth.logout.seq', { route: 'hard', reason: 'router_error' });
+          logHardNavToLogin('router_navigation_failed');
           window.location.assign('/login');
         }
-      } else {
-        // Hard navigation (Phase 4 behavior)
-        log('auth.logout.seq', { route: 'hard', reason: 'feature_flag_disabled' });
-        window.location.assign('/login');
       }
       
     } catch (error) {
