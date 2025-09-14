@@ -57,24 +57,30 @@ export const GlobalMenu: React.FC<GlobalMenuProps> = ({ className = '' }) => {
   };
 
   const handleLogout = async () => {
+    console.log('[DEBUG] GlobalMenu: Logout button clicked');
     try {
+      console.log('[DEBUG] GlobalMenu: Calling logout mutation...');
       await logoutMutation.mutateAsync();
+      console.log('[DEBUG] GlobalMenu: Logout mutation completed');
       setIsOpen(false);
       // Navigation will be handled by auth store subscription
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('[DEBUG] GlobalMenu: Logout error:', error);
       setIsOpen(false);
       // Navigation will be handled by auth store subscription
     }
   };
 
   const handleLogoutAll = async () => {
+    console.log('[DEBUG] GlobalMenu: Logout All button clicked');
     try {
+      console.log('[DEBUG] GlobalMenu: Calling logout-all mutation...');
       await logoutAllMutation.mutateAsync();
+      console.log('[DEBUG] GlobalMenu: Logout-all mutation completed');
       setIsOpen(false);
       // Navigation will be handled by auth store subscription
     } catch (error) {
-      console.error('Logout all error:', error);
+      console.error('[DEBUG] GlobalMenu: Logout all error:', error);
       setIsOpen(false);
       // Navigation will be handled by auth store subscription
     }

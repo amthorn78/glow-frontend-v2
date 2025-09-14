@@ -12,13 +12,23 @@ export const AuthNavigationHandler: React.FC = () => {
 
   useEffect(() => {
     // Only handle navigation after auth is initialized
-    if (!isInitialized) return;
+    if (!isInitialized) {
+      console.log('[DEBUG] AuthNavigationHandler: Not initialized yet');
+      return;
+    }
 
-    const traceEnabled = import.meta.env.VITE_TRACE_AUTH === '1';
+    console.log('[DEBUG] AuthNavigationHandler: Setting up subscription');
+    const traceEnabled = true; // Force enable for debugging
 
     // F1: Subscribe to auth store changes for navigation
     const unsubscribe = useAuthStore.subscribe(
       (state, prevState) => {
+        console.log('[DEBUG] Store subscription fired:', {
+          from: { isAuthenticated: prevState.isAuthenticated },
+          to: { isAuthenticated: state.isAuthenticated },
+          location: location.pathname
+        });
+
         if (traceEnabled) {
           console.log('[STORE] Auth state transition:', {
             from: { isAuthenticated: prevState.isAuthenticated },
