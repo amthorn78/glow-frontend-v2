@@ -34,16 +34,45 @@ export const useCurrentUser = () => {
   return useQuery({
     queryKey: authQueryKeys.me,
     queryFn: async () => {
-      const response = await apiClient.getCurrentUser();
+      const traceEnabled = import.meta.env.VITE_TRACE_AUTH === '1';
       
-      // Always resolves - never throws
-      if (response.data.auth === 'authenticated' && response.data.user) {
-        // Update store with authenticated user
-        authStore.setUser(response.data.user);
-        return { auth: 'authenticated', user: response.data.user };
-      } else {
-        // Clear store for unauthenticated state
-        authStore.logout();
+      if (traceEnabled) {
+        console.log('[BOOTSTRAP] /api/auth/me probe starting...');
+      }
+      
+      try {
+        const response = await apiClient.getCurrentUser();
+        
+        if (traceEnabled) {
+          console.log('[BOOTSTRAP] /api/auth/me response:', {
+            status: response.status,
+            auth: response.data.auth,
+            hasUser: !!response.data.user
+          });
+        }
+        
+        // Always resolves - never throws
+        if (response.data.auth === 'authenticated' && response.data.user) {
+          if (traceEnabled) {
+            console.log('[BOOTSTRAP] Branch: authenticated');
+          }
+          
+          // F3: Do not write directly to store - let AuthProvider handle it
+          return { auth: 'authenticated', user: response.data.user };
+        } else {
+          if (traceEnabled) {
+            console.log('[BOOTSTRAP] Branch: unauthenticated');
+          }
+          
+          // F3: Do not write directly to store - let AuthProvider handle it
+          return { auth: 'unauthenticated', user: null };
+        }
+      } catch (error) {
+        if (traceEnabled) {
+          console.log('[BOOTSTRAP] /api/auth/me error:', error);
+        }
+        
+        // F3: Do not write directly to store - let AuthProvider handle it
         return { auth: 'unauthenticated', user: null };
       }
     },
@@ -80,15 +109,40 @@ export const useLoginMutation = () => {
     },
 
     onSuccess: async (data, variables) => {
+      const traceEnabled = import.meta.env.VITE_TRACE_AUTH === '1';
+      
+      if (traceEnabled) {
+        console.log('[MUTATIONS] Login success:', {
+          ok: data.ok,
+          hasUser: !!data.user,
+          endpoint: '/api/auth/login'
+        });
+      }
+      
       if (data.ok && data.user) {
-        // Update store with login response
-        authStore.login(data.user);
-
-        // Trust pattern: immediately call /api/auth/me for authoritative state
+        // F3: Normalize via /me - do not write directly to store
+        // 1. Invalidate /me query
+        if (traceEnabled) {
+          console.log('[ME_QUERY] Invalidating /me after login');
+        }
+        
+        await queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
+        
+        // 2. Await refetch to get authoritative state
         try {
+          if (traceEnabled) {
+            console.log('[ME_QUERY] Refetching /me for authoritative state');
+          }
+          
           await queryClient.refetchQueries({ queryKey: authQueryKeys.me });
+          
+          if (traceEnabled) {
+            console.log('[ME_QUERY] Refetch complete - store updated from /me');
+          }
         } catch (error) {
-          console.warn('Failed to refetch user after login:', error);
+          if (traceEnabled) {
+            console.warn('[ME_QUERY] Failed to refetch /me after login:', error);
+          }
         }
 
         // Broadcast login to other tabs
@@ -183,8 +237,39 @@ export const useLogoutMutation = () => {
     },
 
     onSuccess: async (data) => {
-      // Clear local state
-      authStore.logout();
+      const traceEnabled = import.meta.env.VITE_TRACE_AUTH === '1';
+      
+      if (traceEnabled) {
+        console.log('[MUTATIONS] Logout success:', {
+          ok: data.ok,
+          endpoint: '/api/auth/logout'
+        });
+      }
+      
+      // F3: Normalize via /me - do not write directly to store
+      // 1. Invalidate /me query
+      if (traceEnabled) {
+        console.log('[ME_QUERY] Invalidating /me after logout');
+      }
+      
+      await queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
+      
+      // 2. Await refetch to get authoritative state
+      try {
+        if (traceEnabled) {
+          console.log('[ME_QUERY] Refetching /me for authoritative state');
+        }
+        
+        await queryClient.refetchQueries({ queryKey: authQueryKeys.me });
+        
+        if (traceEnabled) {
+          console.log('[ME_QUERY] Refetch complete - store updated from /me');
+        }
+      } catch (error) {
+        if (traceEnabled) {
+          console.warn('[ME_QUERY] Failed to refetch /me after logout:', error);
+        }
+      }
 
       // Broadcast logout to other tabs
       if (typeof window !== 'undefined' && window.BroadcastChannel) {
@@ -192,16 +277,16 @@ export const useLogoutMutation = () => {
         channel.postMessage({ type: 'LOGOUT' });
         channel.close();
       }
-
-      // Only invalidate auth queries, not entire cache (T-UI-001 spec)
-      await queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
     },
 
     onError: (error: any) => {
-      console.error('Logout error:', error);
-      // Clear local state even if API call fails
-      authStore.logout();
-      // Only invalidate auth queries, not entire cache (T-UI-001 spec)
+      const traceEnabled = import.meta.env.VITE_TRACE_AUTH === '1';
+      
+      if (traceEnabled) {
+        console.error('[MUTATIONS] Logout error:', error);
+      }
+      
+      // F3: Even on error, normalize via /me
       queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
     },
 
@@ -230,8 +315,39 @@ export const useLogoutAllMutation = () => {
     },
 
     onSuccess: async (data) => {
-      // Clear local state
-      authStore.logout();
+      const traceEnabled = import.meta.env.VITE_TRACE_AUTH === '1';
+      
+      if (traceEnabled) {
+        console.log('[MUTATIONS] Logout-all success:', {
+          ok: data.ok,
+          endpoint: '/api/auth/logout-all'
+        });
+      }
+      
+      // F3: Normalize via /me - do not write directly to store
+      // 1. Invalidate /me query
+      if (traceEnabled) {
+        console.log('[ME_QUERY] Invalidating /me after logout-all');
+      }
+      
+      await queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
+      
+      // 2. Await refetch to get authoritative state
+      try {
+        if (traceEnabled) {
+          console.log('[ME_QUERY] Refetching /me for authoritative state');
+        }
+        
+        await queryClient.refetchQueries({ queryKey: authQueryKeys.me });
+        
+        if (traceEnabled) {
+          console.log('[ME_QUERY] Refetch complete - store updated from /me');
+        }
+      } catch (error) {
+        if (traceEnabled) {
+          console.warn('[ME_QUERY] Failed to refetch /me after logout-all:', error);
+        }
+      }
 
       // Broadcast logout to other tabs
       if (typeof window !== 'undefined' && window.BroadcastChannel) {
@@ -239,16 +355,16 @@ export const useLogoutAllMutation = () => {
         channel.postMessage({ type: 'LOGOUT' });
         channel.close();
       }
-
-      // Only invalidate auth queries, not entire cache (T-UI-001 spec)
-      await queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
     },
 
     onError: (error: any) => {
-      console.error('Logout all error:', error);
-      // Clear local state even if API call fails
-      authStore.logout();
-      // Only invalidate auth queries, not entire cache (T-UI-001 spec)
+      const traceEnabled = import.meta.env.VITE_TRACE_AUTH === '1';
+      
+      if (traceEnabled) {
+        console.error('[MUTATIONS] Logout-all error:', error);
+      }
+      
+      // F3: Even on error, normalize via /me
       queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
     },
 

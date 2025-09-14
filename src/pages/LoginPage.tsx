@@ -21,10 +21,7 @@ const LoginPage: React.FC = () => {
       const response = await loginMutation.mutateAsync(formData);
       
       if (response.ok) {
-        // Wait for auth state to be updated before navigating
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Get returnTo from URL params
+        // Store returnTo for auth store subscription to use
         const searchParams = new URLSearchParams(location.search);
         const returnTo = searchParams.get('returnTo');
         
@@ -33,16 +30,14 @@ const LoginPage: React.FC = () => {
             const decodedReturnTo = decodeURIComponent(returnTo);
             // Validate returnTo is a relative path
             if (decodedReturnTo.startsWith('/') && !decodedReturnTo.startsWith('//')) {
-              navigate(decodedReturnTo, { replace: true });
-              return;
+              sessionStorage.setItem('auth-returnTo', decodedReturnTo);
             }
           } catch (error) {
             console.warn('Invalid returnTo parameter:', returnTo);
           }
         }
         
-        // Default redirect
-        navigate('/dashboard', { replace: true });
+        // Navigation will be handled by auth store subscription
       }
     } catch (error) {
       // Error is handled by the mutation

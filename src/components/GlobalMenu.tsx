@@ -60,15 +60,11 @@ export const GlobalMenu: React.FC<GlobalMenuProps> = ({ className = '' }) => {
     try {
       await logoutMutation.mutateAsync();
       setIsOpen(false);
-      // Wait for auth state to be updated before navigating
-      await new Promise(resolve => setTimeout(resolve, 100));
-      navigate('/login', { replace: true });
+      // Navigation will be handled by auth store subscription
     } catch (error) {
       console.error('Logout error:', error);
-      // Navigate anyway since local state is cleared
       setIsOpen(false);
-      await new Promise(resolve => setTimeout(resolve, 100));
-      navigate('/login', { replace: true });
+      // Navigation will be handled by auth store subscription
     }
   };
 
@@ -76,15 +72,11 @@ export const GlobalMenu: React.FC<GlobalMenuProps> = ({ className = '' }) => {
     try {
       await logoutAllMutation.mutateAsync();
       setIsOpen(false);
-      // Wait for auth state to be updated before navigating
-      await new Promise(resolve => setTimeout(resolve, 100));
-      navigate('/login', { replace: true });
+      // Navigation will be handled by auth store subscription
     } catch (error) {
       console.error('Logout all error:', error);
-      // Navigate anyway since local state is cleared
       setIsOpen(false);
-      await new Promise(resolve => setTimeout(resolve, 100));
-      navigate('/login', { replace: true });
+      // Navigation will be handled by auth store subscription
     }
   };
 

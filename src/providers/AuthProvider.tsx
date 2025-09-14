@@ -53,10 +53,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Handle initialization - set to true on ANY resolution
   useEffect(() => {
     if (isSuccess || isError) {
+      const traceEnabled = import.meta.env.VITE_TRACE_AUTH === '1';
+      
+      if (traceEnabled) {
+        console.log('[BOOTSTRAP] AuthProvider initialization:', {
+          isSuccess,
+          isError,
+          hasAuthResult: !!authResult,
+          auth: authResult?.auth
+        });
+      }
+      
       setIsInitialized(true);
       authStore.setInitialized(true);
+      
+      if (traceEnabled) {
+        console.log('[BOOTSTRAP] isInitialized set to true');
+      }
     }
-  }, [isSuccess, isError, authStore]);
+  }, [isSuccess, isError, authStore, authResult]);
 
   // Handle authentication state from resolved result
   useEffect(() => {
