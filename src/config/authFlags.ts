@@ -11,6 +11,7 @@ interface AuthFlags {
   AUTH_LOGIN_HANDSHAKE_ENFORCED: boolean;
   AUTH_HANDSHAKE_ENFORCED: boolean; // F3: New flag for handshake sequencing
   AUTH_GLOBAL_401_ENABLED: boolean; // F5: New flag for global 401 interceptor
+  FEAT_LOGOUT_ALL: boolean; // GM-3: Feature flag for logout-all functionality
   AUTH_TELEMETRY_SAMPLING: number;
   AUTH_CANARY_PERCENT: number;
 }
@@ -46,6 +47,9 @@ const DEFAULT_FLAGS: AuthFlags = {
   
   // F5: Global 401 interceptor enabled by default
   AUTH_GLOBAL_401_ENABLED: true,
+  
+  // GM-3: Logout-All feature disabled for initial release
+  FEAT_LOGOUT_ALL: false,
   
   // Breadcrumb sampling rate (dev=1.0, staging=0.5, prod≈0.1)
   AUTH_TELEMETRY_SAMPLING: process.env.NODE_ENV === 'development' ? 1.0 : 
@@ -86,6 +90,7 @@ export const isGlobal401ExcludeMe = (): boolean => getAuthFlag('AUTH_GLOBAL401_E
 export const isLoginHandshakeEnforced = (): boolean => getAuthFlag('AUTH_LOGIN_HANDSHAKE_ENFORCED');
 export const isHandshakeEnforced = (): boolean => getAuthFlag('AUTH_HANDSHAKE_ENFORCED'); // F3: New convenience function
 export const isGlobal401Enabled = (): boolean => getAuthFlag('AUTH_GLOBAL_401_ENABLED'); // F5: New convenience function
+export const isLogoutAllEnabled = (): boolean => getAuthFlag('FEAT_LOGOUT_ALL'); // GM-3: New convenience function
 export const getTelemetrySampling = (): number => getAuthFlag('AUTH_TELEMETRY_SAMPLING');
 export const getCanaryPercent = (): number => getAuthFlag('AUTH_CANARY_PERCENT');
 
@@ -111,6 +116,7 @@ export const getAllAuthFlags = (): AuthFlags => ({
   AUTH_LOGIN_HANDSHAKE_ENFORCED: getAuthFlag('AUTH_LOGIN_HANDSHAKE_ENFORCED'),
   AUTH_HANDSHAKE_ENFORCED: getAuthFlag('AUTH_HANDSHAKE_ENFORCED'), // F3: Include new flag
   AUTH_GLOBAL_401_ENABLED: getAuthFlag('AUTH_GLOBAL_401_ENABLED'), // F5: Include new flag
+  FEAT_LOGOUT_ALL: getAuthFlag('FEAT_LOGOUT_ALL'), // GM-3: Include new flag
   AUTH_TELEMETRY_SAMPLING: getAuthFlag('AUTH_TELEMETRY_SAMPLING'),
   AUTH_CANARY_PERCENT: getAuthFlag('AUTH_CANARY_PERCENT'),
 });
@@ -133,6 +139,7 @@ export default {
   isLoginHandshakeEnforced,
   isHandshakeEnforced, // F3: Add to exports
   isGlobal401Enabled, // F5: Add to exports
+  isLogoutAllEnabled, // GM-3: Add to exports
   getTelemetrySampling,
   getCanaryPercent,
   assertHardNavOnly,
