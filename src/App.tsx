@@ -18,6 +18,7 @@ import BirthDataComparisonPage from './pages/BirthDataComparisonPage';
 import EnhancedBirthDataPage from './pages/EnhancedBirthDataPage';
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
+import SettingsPage from './pages/SettingsPage';
 import Magic10SetupPage from './pages/Magic10SetupPage';
 import ResonanceTenSetupPage from './pages/ResonanceTenSetupPage';
 import DiscoveryPage from './pages/DiscoveryPage';
@@ -82,6 +83,15 @@ const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute>
               <ProfilePage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/settings" 
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
             </ProtectedRoute>
           } 
         />
