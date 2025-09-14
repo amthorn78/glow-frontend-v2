@@ -193,15 +193,16 @@ export const useLogoutMutation = () => {
         channel.close();
       }
 
-      // Clear all cached data
-      queryClient.clear();
+      // Only invalidate auth queries, not entire cache (T-UI-001 spec)
+      await queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
     },
 
     onError: (error: any) => {
       console.error('Logout error:', error);
       // Clear local state even if API call fails
       authStore.logout();
-      queryClient.clear();
+      // Only invalidate auth queries, not entire cache (T-UI-001 spec)
+      queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
     },
 
     onSettled: () => {
@@ -239,15 +240,16 @@ export const useLogoutAllMutation = () => {
         channel.close();
       }
 
-      // Clear all cached data
-      queryClient.clear();
+      // Only invalidate auth queries, not entire cache (T-UI-001 spec)
+      await queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
     },
 
     onError: (error: any) => {
       console.error('Logout all error:', error);
       // Clear local state even if API call fails
       authStore.logout();
-      queryClient.clear();
+      // Only invalidate auth queries, not entire cache (T-UI-001 spec)
+      queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
     },
 
     onSettled: () => {
@@ -416,7 +418,8 @@ export const useDeleteAccountMutation = () => {
       if (data.success) {
         // Clear all state and redirect
         authStore.logout();
-        queryClient.clear();
+        // Only invalidate auth queries, not entire cache (T-UI-001 spec)
+        await queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
         
         // Broadcast logout to other tabs
         if (typeof window !== 'undefined' && window.BroadcastChannel) {

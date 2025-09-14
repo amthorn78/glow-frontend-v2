@@ -12,8 +12,8 @@ import { Button } from './ui/button';
 // FEATURE FLAG
 // ============================================================================
 
-// T-UI-001 Feature flag - can be controlled via environment or config
-const GLOBAL_MENU_ENABLED = true; // ui.globalMenu.enabled
+// T-UI-001 Feature flag - GLOBAL_MENU_ENABLED (default true, can be disabled)
+const GLOBAL_MENU_ENABLED = process.env.REACT_APP_GLOBAL_MENU_ENABLED !== 'false';
 
 // ============================================================================
 // TYPES
