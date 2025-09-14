@@ -229,6 +229,11 @@ class ApiClient {
     return response;
   }
 
+  async logoutAll(): Promise<ApiResponse<{ ok: boolean; revoked_count: number; self_revoked: boolean }>> {
+    const response = await this.post<{ ok: boolean; revoked_count: number; self_revoked: boolean }>('/api/auth/logout-all');
+    return response;
+  }
+
   async getCurrentUser(): Promise<ApiResponse<{ auth: 'authenticated' | 'unauthenticated'; user?: User; error?: string; code?: string }>> {
     try {
       // Special handling for /me endpoint - don't throw on 401

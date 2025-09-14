@@ -210,6 +210,52 @@ export const useLogoutMutation = () => {
   });
 };
 
+/**
+ * Logout All Sessions mutation - T-UI-001
+ */
+export const useLogoutAllMutation = () => {
+  const queryClient = useQueryClient();
+  const authStore = useAuthStore();
+
+  return useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.logoutAll();
+      return response.data;
+    },
+
+    onMutate: async () => {
+      authStore.setLoading(true);
+      return {};
+    },
+
+    onSuccess: async (data) => {
+      // Clear local state
+      authStore.logout();
+
+      // Broadcast logout to other tabs
+      if (typeof window !== 'undefined' && window.BroadcastChannel) {
+        const channel = new BroadcastChannel('glow-auth');
+        channel.postMessage({ type: 'LOGOUT' });
+        channel.close();
+      }
+
+      // Clear all cached data
+      queryClient.clear();
+    },
+
+    onError: (error: any) => {
+      console.error('Logout all error:', error);
+      // Clear local state even if API call fails
+      authStore.logout();
+      queryClient.clear();
+    },
+
+    onSettled: () => {
+      authStore.setLoading(false);
+    },
+  });
+};
+
 // ============================================================================
 // PROFILE MUTATIONS
 // ============================================================================
