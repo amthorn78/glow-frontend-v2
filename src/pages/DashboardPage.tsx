@@ -1,8 +1,12 @@
+// Dashboard Page - Auth v2 Integration
+// Phase 2B: DISSOLUTION - Intelligence Interface
+
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useMagic10Store } from '../stores/magic10Store';
 import Magic10SimpleDisplay from '../components/Magic10SimpleDisplay';
+import { LogoutButton } from '../components/LogoutButton';
 
 // Dashboard Components
 const UserWelcome: React.FC<{ user: any }> = ({ user }) => {
@@ -11,9 +15,17 @@ const UserWelcome: React.FC<{ user: any }> = ({ user }) => {
 
   return (
     <div className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-6 rounded-xl mb-6">
-      <h1 className="text-2xl font-bold mb-2">
-        {greeting}, {user?.firstName || 'there'}! ✨
-      </h1>
+      <div className="flex justify-between items-start mb-2">
+        <h1 className="text-2xl font-bold">
+          {greeting}, {user?.firstName || 'there'}! ✨
+        </h1>
+        <LogoutButton 
+          variant="link" 
+          className="text-pink-100 hover:text-white text-sm"
+        >
+          Logout
+        </LogoutButton>
+      </div>
       <p className="text-pink-100">
         Welcome back to your connection journey
       </p>
