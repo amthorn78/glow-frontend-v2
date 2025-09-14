@@ -121,7 +121,7 @@ export const useLoginMutation = () => {
       }
       
       if (data.ok && data.user) {
-        // Step 2: Synchronous navigation flow
+        // CRITICAL FIX: Use refetchQueries to trigger AuthProvider hook updates
         // 1. Invalidate /me query
         if (traceEnabled) {
           console.log('[SYNC_NAV] Step 1: Invalidating /me after login');
@@ -129,44 +129,29 @@ export const useLoginMutation = () => {
         
         await queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
         
-        // 2. Fetch fresh /me state (not just refetch)
+        // 2. Refetch to trigger AuthProvider's useCurrentUser() hook
         try {
           if (traceEnabled) {
-            console.log('[SYNC_NAV] Step 2: Fetching fresh /me for authoritative state');
+            console.log('[SYNC_NAV] Step 2: Refetching /me to trigger AuthProvider hook');
           }
           
-          const freshMeResult = await queryClient.fetchQuery({
+          await queryClient.refetchQueries({ 
             queryKey: authQueryKeys.me,
-            queryFn: async () => {
-              const response = await apiClient.getCurrentUser();
-              if (response.data.auth === 'authenticated' && response.data.user) {
-                return { auth: 'authenticated', user: response.data.user };
-              } else {
-                return { auth: 'unauthenticated', user: null };
-              }
-            },
-            retry: false,
-            staleTime: 0 // Force fresh fetch
+            type: 'active' // Only refetch active queries (the AuthProvider hook)
           });
           
           if (traceEnabled) {
-            console.log('[SYNC_NAV] Step 3: Fresh /me result:', freshMeResult);
+            console.log('[SYNC_NAV] Step 3: Refetch complete - AuthProvider should update store');
           }
           
-          // 3. Only navigate after confirmed fresh state
-          if (freshMeResult.auth === 'authenticated') {
-            if (traceEnabled) {
-              console.log('[SYNC_NAV] Step 4: Navigating to dashboard with confirmed auth state');
-            }
-            
-            // Import navigate dynamically to avoid circular deps
-            const { navigate } = await import('react-router-dom');
-            navigate('/dashboard'); // Step 3: Drop replace:true for now
+          // 3. Navigation will be handled by AuthNavigationHandler when store updates
+          if (traceEnabled) {
+            console.log('[SYNC_NAV] Step 4: Waiting for store update to trigger navigation');
           }
           
         } catch (error) {
           if (traceEnabled) {
-            console.warn('[SYNC_NAV] Failed to fetch fresh /me after login:', error);
+            console.warn('[SYNC_NAV] Failed to refetch /me after login:', error);
           }
         }
 
@@ -271,7 +256,7 @@ export const useLogoutMutation = () => {
         });
       }
       
-      // Step 2: Synchronous navigation flow for logout
+      // CRITICAL FIX: Use refetchQueries to trigger AuthProvider hook updates
       // 1. Invalidate /me query
       if (traceEnabled) {
         console.log('[SYNC_NAV] Step 1: Invalidating /me after logout');
@@ -279,44 +264,29 @@ export const useLogoutMutation = () => {
       
       await queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
       
-      // 2. Fetch fresh /me state to confirm logout
+      // 2. Refetch to trigger AuthProvider's useCurrentUser() hook
       try {
         if (traceEnabled) {
-          console.log('[SYNC_NAV] Step 2: Fetching fresh /me to confirm logout');
+          console.log('[SYNC_NAV] Step 2: Refetching /me to trigger AuthProvider hook');
         }
         
-        const freshMeResult = await queryClient.fetchQuery({
+        await queryClient.refetchQueries({ 
           queryKey: authQueryKeys.me,
-          queryFn: async () => {
-            const response = await apiClient.getCurrentUser();
-            if (response.data.auth === 'authenticated' && response.data.user) {
-              return { auth: 'authenticated', user: response.data.user };
-            } else {
-              return { auth: 'unauthenticated', user: null };
-            }
-          },
-          retry: false,
-          staleTime: 0 // Force fresh fetch
+          type: 'active' // Only refetch active queries (the AuthProvider hook)
         });
         
         if (traceEnabled) {
-          console.log('[SYNC_NAV] Step 3: Fresh /me result after logout:', freshMeResult);
+          console.log('[SYNC_NAV] Step 3: Refetch complete - AuthProvider should update store');
         }
         
-        // 3. Only navigate after confirmed logout state
-        if (freshMeResult.auth === 'unauthenticated') {
-          if (traceEnabled) {
-            console.log('[SYNC_NAV] Step 4: Navigating to login with confirmed logout state');
-          }
-          
-          // Import navigate dynamically to avoid circular deps
-          const { navigate } = await import('react-router-dom');
-          navigate('/login'); // Step 3: Drop replace:true for now
+        // 3. Navigation will be handled by AuthNavigationHandler when store updates
+        if (traceEnabled) {
+          console.log('[SYNC_NAV] Step 4: Waiting for store update to trigger navigation');
         }
         
       } catch (error) {
         if (traceEnabled) {
-          console.warn('[SYNC_NAV] Failed to fetch fresh /me after logout:', error);
+          console.warn('[SYNC_NAV] Failed to refetch /me after logout:', error);
         }
       }
 
