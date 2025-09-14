@@ -1,10 +1,12 @@
-// Protected Route - T-UI-001 Phase 5
+// Protected Route - T-UI-001 Phase 5 + GM11-FE-2
 // Enhanced route guard with deterministic logic and telemetry
+// Integrated with AuthenticatedLayout for GlobalMenu shell
 
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useAuthContext } from '../providers/AuthProvider';
+import { AuthenticatedLayout } from './AuthenticatedLayout';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -59,8 +61,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Render protected content
-  return <>{children}</>;
+  // Render protected content wrapped in AuthenticatedLayout
+  return (
+    <AuthenticatedLayout>
+      {children}
+    </AuthenticatedLayout>
+  );
 };
 
 export default ProtectedRoute;

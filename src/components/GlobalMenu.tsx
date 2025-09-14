@@ -1,11 +1,13 @@
-// GM-1: Global Menu Shell - T-UI-001 Phase 6
+// GM-1: Global Menu Shell - T-UI-001 Phase 6 + GM11-FE-3
 // Hybrid UI: Persistent bar (desktop) + hamburger/popover (mobile)
-// Hard navigation only, CSRF protection, cross-tab coherence
+// Hard navigation only, CSRF protection via centralized wrapper, cross-tab coherence
 
 import React, { useState, useRef, useEffect } from 'react';
 import { User, Settings, LogOut, Menu, X, Users } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { isLogoutAllEnabled } from '../config/authFlags';
+import { emitAuthBreadcrumb } from '../utils/authTelemetry';
+import { logoutWithCsrf, logoutAllWithCsrf } from '../utils/csrfMutations';
 
 interface GlobalMenuProps {
   className?: string;
@@ -67,86 +69,40 @@ export const GlobalMenu: React.FC<GlobalMenuProps> = ({ className = '' }) => {
     return name.slice(0, 2).toUpperCase();
   };
 
-  // GM-2: Logout action with hard navigation
+  // GM-2: Logout action with centralized CSRF handling
   const handleLogout = async () => {
     if (isLoggingOut) return;
     
     setIsLoggingOut(true);
-    console.log('[AUTH_BREADCRUMB] ui.globalmenu.logout.click', JSON.stringify({
-      timestamp: new Date().toISOString(),
+    emitAuthBreadcrumb('auth.logout.request', {
       user_id: user.id
-    }));
+    });
 
     try {
-      // Get CSRF token
-      let csrfToken = '';
-      try {
-        const csrfResponse = await fetch('/api/auth/csrf', {
-          method: 'GET',
-          credentials: 'include'
-        });
-        if (csrfResponse.ok) {
-          const csrfData = await csrfResponse.json();
-          csrfToken = csrfData.csrf_token;
-        }
-      } catch (error) {
-        console.warn('[AUTH_BREADCRUMB] auth.logout.csrf_fetch_failed', { error: error.message });
+      // Use centralized CSRF mutation wrapper
+      const result = await logoutWithCsrf();
+
+      if (result.ok) {
+        emitAuthBreadcrumb('auth.logout.success', {});
+
+        // Clear auth store
+        useAuthStore.getState().clearAuth();
+
+        // GM-4: BroadcastChannel for cross-tab coherence
+        const channel = new BroadcastChannel('glow-auth');
+        channel.postMessage({ type: 'LOGOUT', timestamp: new Date().toISOString() });
+        channel.close();
+
+        // GM-2: Hard navigation to login
+        window.location.assign('/login');
+      } else {
+        throw new Error(result.error || 'Logout failed');
       }
-
-      // Logout request
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrfToken && { 'X-CSRF-Token': csrfToken })
-        }
-      });
-
-      console.log('[AUTH_BREADCRUMB] auth.logout.http_200', JSON.stringify({
-        status: response.status,
-        timestamp: new Date().toISOString()
-      }));
-
-      if (response.status === 403 && csrfToken) {
-        // CSRF retry
-        console.log('[AUTH_BREADCRUMB] auth.logout.csrf_retry', JSON.stringify({
-          timestamp: new Date().toISOString()
-        }));
-
-        const retryResponse = await fetch('/api/auth/logout', {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': csrfToken
-          }
-        });
-
-        if (!retryResponse.ok) {
-          throw new Error(`Logout failed after CSRF retry: ${retryResponse.status}`);
-        }
-      } else if (!response.ok) {
-        throw new Error(`Logout failed: ${response.status}`);
-      }
-
-      // Clear auth store
-      useAuthStore.getState().clearAuth();
-
-      // GM-4: BroadcastChannel for cross-tab coherence
-      const channel = new BroadcastChannel('glow-auth');
-      channel.postMessage({ type: 'LOGOUT', timestamp: new Date().toISOString() });
-      channel.close();
-
-      console.log('[AUTH_BREADCRUMB] auth.logout.done', JSON.stringify({
-        timestamp: new Date().toISOString()
-      }));
-
-      // GM-2: Hard navigation to login
-      window.location.assign('/login');
 
     } catch (error) {
-      console.error('[AUTH_BREADCRUMB] auth.logout.error', { error: error.message });
+      emitAuthBreadcrumb('auth.login.break_glass.reload', { 
+        error_code: error instanceof Error ? error.message : 'Unknown error' 
+      });
       setIsLoggingOut(false);
       
       // Show error to user
@@ -154,89 +110,43 @@ export const GlobalMenu: React.FC<GlobalMenuProps> = ({ className = '' }) => {
     }
   };
 
-  // GM-3: Logout-All action (feature-flagged)
+  // GM-3: Logout-All action with centralized CSRF handling (feature-flagged)
   const handleLogoutAll = async () => {
     if (isLoggingOutAll || !logoutAllEnabled) return;
     
     setIsLoggingOutAll(true);
-    console.log('[AUTH_BREADCRUMB] ui.globalmenu.logout_all.click', JSON.stringify({
-      timestamp: new Date().toISOString(),
+    emitAuthBreadcrumb('auth.logout.request', {
       user_id: user.id
-    }));
+    });
 
     try {
-      // Get CSRF token
-      let csrfToken = '';
-      try {
-        const csrfResponse = await fetch('/api/auth/csrf', {
-          method: 'GET',
-          credentials: 'include'
-        });
-        if (csrfResponse.ok) {
-          const csrfData = await csrfResponse.json();
-          csrfToken = csrfData.csrf_token;
-        }
-      } catch (error) {
-        console.warn('[AUTH_BREADCRUMB] auth.logout_all.csrf_fetch_failed', { error: error.message });
+      // Use centralized CSRF mutation wrapper
+      const result = await logoutAllWithCsrf();
+
+      if (result.ok) {
+        emitAuthBreadcrumb('auth.logout.success', {});
+
+        // Show success message
+        alert('Logged out everywhere');
+
+        // Clear auth store
+        useAuthStore.getState().clearAuth();
+
+        // GM-4: BroadcastChannel for cross-tab coherence
+        const channel = new BroadcastChannel('glow-auth');
+        channel.postMessage({ type: 'LOGOUT_ALL', timestamp: new Date().toISOString() });
+        channel.close();
+
+        // GM-2: Hard navigation to login
+        window.location.assign('/login');
+      } else {
+        throw new Error(result.error || 'Logout-All failed');
       }
-
-      // Logout-All request
-      const response = await fetch('/api/auth/logout-all', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrfToken && { 'X-CSRF-Token': csrfToken })
-        }
-      });
-
-      console.log('[AUTH_BREADCRUMB] auth.logout_all.http_200', JSON.stringify({
-        status: response.status,
-        timestamp: new Date().toISOString()
-      }));
-
-      if (response.status === 403 && csrfToken) {
-        // CSRF retry
-        console.log('[AUTH_BREADCRUMB] auth.logout_all.csrf_retry', JSON.stringify({
-          timestamp: new Date().toISOString()
-        }));
-
-        const retryResponse = await fetch('/api/auth/logout-all', {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': csrfToken
-          }
-        });
-
-        if (!retryResponse.ok) {
-          throw new Error(`Logout-All failed after CSRF retry: ${retryResponse.status}`);
-        }
-      } else if (!response.ok) {
-        throw new Error(`Logout-All failed: ${response.status}`);
-      }
-
-      // Show success message
-      alert('Logged out everywhere');
-
-      // Clear auth store
-      useAuthStore.getState().clearAuth();
-
-      // GM-4: BroadcastChannel for cross-tab coherence
-      const channel = new BroadcastChannel('glow-auth');
-      channel.postMessage({ type: 'LOGOUT_ALL', timestamp: new Date().toISOString() });
-      channel.close();
-
-      console.log('[AUTH_BREADCRUMB] auth.logout_all.done', JSON.stringify({
-        timestamp: new Date().toISOString()
-      }));
-
-      // GM-2: Hard navigation to login
-      window.location.assign('/login');
 
     } catch (error) {
-      console.error('[AUTH_BREADCRUMB] auth.logout_all.error', { error: error.message });
+      emitAuthBreadcrumb('auth.login.break_glass.reload', { 
+        error_code: error instanceof Error ? error.message : 'Unknown error' 
+      });
       setIsLoggingOutAll(false);
       
       // Show error to user
@@ -246,25 +156,20 @@ export const GlobalMenu: React.FC<GlobalMenuProps> = ({ className = '' }) => {
 
   // GM-4: Profile and Settings hard navigation
   const handleProfile = () => {
-    console.log('[AUTH_BREADCRUMB] ui.globalmenu.profile.click', JSON.stringify({
-      timestamp: new Date().toISOString()
-    }));
+    emitAuthBreadcrumb('auth.nav.hard.to_dashboard', { route: '/profile' });
     window.location.assign('/profile');
   };
 
   const handleSettings = () => {
-    console.log('[AUTH_BREADCRUMB] ui.globalmenu.settings.click', JSON.stringify({
-      timestamp: new Date().toISOString()
-    }));
+    emitAuthBreadcrumb('auth.nav.hard.to_dashboard', { route: '/settings' });
     window.location.assign('/settings');
   };
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
-    console.log('[AUTH_BREADCRUMB] ui.globalmenu.open', JSON.stringify({
-      isOpen: !isOpen,
-      timestamp: new Date().toISOString()
-    }));
+    emitAuthBreadcrumb('auth.bootstrap.me.start', {
+      route: 'globalmenu_toggle'
+    });
   };
 
   return (
