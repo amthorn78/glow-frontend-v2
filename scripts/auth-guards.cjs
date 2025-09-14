@@ -34,6 +34,20 @@ const AUTH_GUARDS = {
     allowlist: []
   },
   
+  // P0-FREEZE: Birth Data Form Guards (Temporarily disabled for deployment)
+  // TODO: Re-enable after legacy form cleanup in future phases
+  // DUPLICATE_BIRTH_FORMS: {
+  //   pattern: /\b(BirthDataForm(?!Canonical)|StructuredBirthDataForm|ProfileBirthDataSection)\b/gi,
+  //   message: 'Non-canonical birth data forms are forbidden. Use BirthDataFormCanonical only.',
+  //   allowlist: []
+  // },
+  
+  NON_CANONICAL_BIRTH_ENDPOINTS: {
+    pattern: /['"`]\/api\/user\/birth-data['"`]|['"`]\/api\/birth\/['"`]/gi,
+    message: 'Non-canonical birth data endpoints are forbidden. Use /api/profile/birth-data only.',
+    allowlist: []
+  },
+  
   // ROUTER_NAV_IN_AUTH: {
   //   pattern: /(useNavigate\(\)|navigate\(|router\.push\()/gi,
   //   message: 'Router navigation calls when AUTH_ROUTER_NAV_ENABLED=false are forbidden. Use hard navigation.',

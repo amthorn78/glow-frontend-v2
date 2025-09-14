@@ -4,7 +4,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useMagic10Store } from '../stores/magic10Store';
 import { useUserBirthData } from '../queries/auth/authQueries';
 import Magic10SimpleDisplay from '../components/Magic10SimpleDisplay';
-import StructuredBirthDataForm from '../components/StructuredBirthDataForm';
+import BirthDataFormCanonical from '../components/BirthDataFormCanonical';
 import apiClient from '../core/api';
 
 const ProfilePage: React.FC = () => {
@@ -293,18 +293,12 @@ const ProfilePage: React.FC = () => {
           </div>
 
           {editingSection === 'birth' ? (
-            <StructuredBirthDataForm 
-              initialData={birthData}
-              onSubmit={async (formData) => {
-                // Send structured data directly to API (new format)
-                const response = await apiClient.updateBirthData(formData);
-                if (!response.success) {
-                  throw new Error(response.message || 'Failed to save birth data');
-                }
-              }}
+            <BirthDataFormCanonical 
+              onSuccess={() => setEditingSection(null)}
               onCancel={() => setEditingSection(null)}
               submitButtonText="Save Birth Data"
               showCancelButton={true}
+              className="shadow-none p-0"
             />
           ) : (
             <div className="space-y-3">

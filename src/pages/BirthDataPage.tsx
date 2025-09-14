@@ -1,9 +1,9 @@
 import React from 'react';
-import BirthDataFormV2 from '../components/BirthDataFormV2';
+import BirthDataFormCanonical from '../components/BirthDataFormCanonical';
 
 const BirthDataPage: React.FC = () => {
   const handleSuccess = () => {
-    // T-FE-002: No router navigation - use hard navigation if needed
+    // P0-FREEZE: No router navigation - use hard navigation if needed
     // For now, just show success feedback (handled by form component)
     console.log('Birth data saved successfully');
   };
@@ -17,7 +17,7 @@ const BirthDataPage: React.FC = () => {
         </p>
       </div>
 
-      <BirthDataFormV2
+      <BirthDataFormCanonical
         onSuccess={handleSuccess}
         submitButtonText="Save Birth Data"
       />

@@ -395,7 +395,7 @@ class ApiClient {
   }
 
   async updateBirthData(birthData: BirthDataForm): Promise<ApiResponse<{ user: User }>> {
-    const response = await this.patch<{ user: User }>('/api/user/birth-data', birthData);
+    const response = await this.patch<{ user: User }>('/api/profile/birth-data', birthData);
     return response;
   }
 

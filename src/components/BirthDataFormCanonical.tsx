@@ -1,4 +1,4 @@
-// T-FE-002: Birth Data Round-Trip Component
+// P0-FREEZE: Canonical Birth Data Form - Single Source of Truth
 // Loads from /api/auth/me, saves via CSRF wrapper, invalidates & refetches
 
 import React, { useState, useEffect } from 'react';
@@ -7,25 +7,27 @@ import { useCurrentUser } from '../queries/auth/authQueries';
 import { updateBirthDataWithCsrf } from '../utils/csrfMutations';
 import { emitAuthBreadcrumb } from '../utils/authTelemetry';
 
-interface BirthDataFormV2Props {
+interface BirthDataFormCanonicalProps {
   onSuccess?: () => void;
   onCancel?: () => void;
   submitButtonText?: string;
   showCancelButton?: boolean;
+  className?: string;
 }
 
 interface BirthDataFormData {
-  date: string;      // YYYY-MM-DD
-  time: string;      // HH:MM:SS
+  date: string;      // YYYY-MM-DD (ISO format)
+  time: string;      // HH:MM:SS (24h format)
   timezone: string;  // IANA timezone
-  location: string;  // Free text location
+  location: string;  // Free text location (optional)
 }
 
-const BirthDataFormV2: React.FC<BirthDataFormV2Props> = ({
+const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
   onSuccess,
   onCancel,
   submitButtonText = "Save Birth Data",
-  showCancelButton = false
+  showCancelButton = false,
+  className = ""
 }) => {
   const queryClient = useQueryClient();
   const { data: currentUser, isLoading: isLoadingUser } = useCurrentUser();
@@ -33,7 +35,7 @@ const BirthDataFormV2: React.FC<BirthDataFormV2Props> = ({
   const [formData, setFormData] = useState<BirthDataFormData>({
     date: '',
     time: '',
-    timezone: '',
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Default to user's timezone
     location: ''
   });
   
@@ -41,7 +43,7 @@ const BirthDataFormV2: React.FC<BirthDataFormV2Props> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
 
-  // Load initial data from /api/auth/me
+  // Load initial data from /api/auth/me (single source of truth)
   useEffect(() => {
     if (currentUser?.auth === 'authenticated' && currentUser.user?.birth_data) {
       const birthData = currentUser.user.birth_data;
@@ -49,13 +51,13 @@ const BirthDataFormV2: React.FC<BirthDataFormV2Props> = ({
       setFormData({
         date: birthData.date || '',
         time: birthData.time || '',
-        timezone: birthData.timezone || '',
+        timezone: birthData.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
         location: birthData.location || ''
       });
     }
   }, [currentUser]);
 
-  // Common timezones for dropdown
+  // Common IANA timezones for dropdown
   const commonTimezones = [
     'America/New_York',
     'America/Chicago', 
@@ -68,11 +70,15 @@ const BirthDataFormV2: React.FC<BirthDataFormV2Props> = ({
     'Europe/Paris',
     'Europe/Berlin',
     'Europe/Rome',
+    'Europe/Madrid',
+    'Europe/Amsterdam',
     'Asia/Tokyo',
     'Asia/Shanghai',
     'Asia/Kolkata',
+    'Asia/Dubai',
     'Australia/Sydney',
-    'Australia/Melbourne'
+    'Australia/Melbourne',
+    'Pacific/Auckland'
   ];
 
   // Validate form data
@@ -88,6 +94,8 @@ const BirthDataFormV2: React.FC<BirthDataFormV2Props> = ({
       const date = new Date(formData.date);
       if (isNaN(date.getTime())) {
         newErrors.date = 'Invalid date';
+      } else if (date > new Date()) {
+        newErrors.date = 'Birth date cannot be in the future';
       }
     }
 
@@ -98,23 +106,19 @@ const BirthDataFormV2: React.FC<BirthDataFormV2Props> = ({
       newErrors.time = 'Time must be in HH:MM or HH:MM:SS format';
     }
 
-    // Validate timezone
+    // Validate timezone (required IANA)
     if (!formData.timezone) {
       newErrors.timezone = 'Timezone is required';
     }
 
-    // Validate location
-    if (!formData.location.trim()) {
-      newErrors.location = 'Location is required';
-    } else if (formData.location.length > 255) {
-      newErrors.location = 'Location must be 255 characters or less';
-    }
+    // Location is optional - no validation needed
+    // Lat/lng are not displayed and not required (FEAT_GEO=false)
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Normalize time to HH:MM:SS format
+  // Normalize time to HH:MM:SS format for server
   const normalizeTime = (time: string): string => {
     if (time.includes(':')) {
       const parts = time.split(':');
@@ -142,20 +146,24 @@ const BirthDataFormV2: React.FC<BirthDataFormV2Props> = ({
         has_location: !!formData.location
       });
 
-      // Prepare data for API (normalize time to HH:MM:SS)
+      // Prepare data for API (normalize time to HH:MM:SS, trim location)
       const birthDataPayload = {
         date: formData.date,
         time: normalizeTime(formData.time),
         timezone: formData.timezone,
-        location: formData.location
+        location: formData.location.trim() || null,
+        // Note: lat/lng not included (FEAT_GEO=false)
+        latitude: null,
+        longitude: null
       };
 
       emitAuthBreadcrumb('api.birth.put.request', {
         has_csrf: true,
-        tz: formData.timezone
+        tz: formData.timezone,
+        has_geocode: false
       });
 
-      // Save via CSRF wrapper
+      // Save via centralized CSRF wrapper
       const response = await updateBirthDataWithCsrf(birthDataPayload);
 
       if (response.ok) {
@@ -163,7 +171,7 @@ const BirthDataFormV2: React.FC<BirthDataFormV2Props> = ({
           latency_ms: Date.now() - Date.now() // Approximate
         });
 
-        // Invalidate and refetch /api/auth/me
+        // Invalidate and refetch /api/auth/me (round-trip guarantee)
         await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
         await queryClient.refetchQueries({ queryKey: ['auth', 'me'] });
 
@@ -184,7 +192,7 @@ const BirthDataFormV2: React.FC<BirthDataFormV2Props> = ({
         // Handle API errors
         if (response.code?.includes('VALIDATION')) {
           emitAuthBreadcrumb('api.birth.put.validation_error', {
-            fields: Object.keys(errors)
+            error_code: response.code
           });
           
           setErrors({ submit: response.error || 'Validation error occurred' });
@@ -202,7 +210,7 @@ const BirthDataFormV2: React.FC<BirthDataFormV2Props> = ({
 
   if (isLoadingUser) {
     return (
-      <div className="bg-white rounded-xl p-6 shadow-lg">
+      <div className={`bg-white rounded-xl p-6 shadow-lg ${className}`}>
         <div className="animate-pulse">
           <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
           <div className="space-y-4">
@@ -217,7 +225,7 @@ const BirthDataFormV2: React.FC<BirthDataFormV2Props> = ({
   }
 
   return (
-    <div className="bg-white rounded-xl p-6 shadow-lg relative">
+    <div className={`bg-white rounded-xl p-6 shadow-lg relative ${className}`}>
       {/* Success Toast */}
       {showSuccessToast && (
         <div className="absolute top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-10">
@@ -244,6 +252,7 @@ const BirthDataFormV2: React.FC<BirthDataFormV2Props> = ({
             type="date"
             value={formData.date}
             onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+            max={new Date().toISOString().split('T')[0]} // Prevent future dates
             className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 ${
               errors.date ? 'border-red-500' : 'border-gray-300'
             }`}
@@ -297,20 +306,20 @@ const BirthDataFormV2: React.FC<BirthDataFormV2Props> = ({
         {/* Birth Location */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Birth Location <span className="text-red-500">*</span>
+            Birth Location
           </label>
           <input
             type="text"
             value={formData.location}
             onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-            placeholder="City, State/Province, Country"
+            placeholder="City, State/Province, Country (optional)"
             maxLength={255}
-            className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 ${
-              errors.location ? 'border-red-500' : 'border-gray-300'
-            }`}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
             disabled={isSubmitting}
           />
-          {errors.location && <p className="text-red-500 text-xs mt-1">{errors.location}</p>}
+          <p className="text-gray-500 text-xs mt-1">
+            Optional - used for timezone validation and future features
+          </p>
         </div>
 
         {/* Submit Error */}
@@ -349,5 +358,5 @@ const BirthDataFormV2: React.FC<BirthDataFormV2Props> = ({
   );
 };
 
-export default BirthDataFormV2;
+export default BirthDataFormCanonical;
 
