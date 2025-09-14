@@ -1,7 +1,7 @@
-// Minimal Logout Button - T-UI-001 Phase 1
-// Simple logout with hard navigation to avoid race conditions
+// Enhanced Logout Button - T-UI-001 Phase 4
+// Essentials-only UX improvements with guardrails
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useAuthStore } from '../stores/authStore';
 
 interface LogoutButtonProps {
@@ -10,6 +10,36 @@ interface LogoutButtonProps {
   variant?: 'button' | 'link';
 }
 
+// Simple toast notification for errors
+const showToast = (message: string) => {
+  // Create a simple toast element
+  const toast = document.createElement('div');
+  toast.textContent = message;
+  toast.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #ef4444;
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 9999;
+    max-width: 300px;
+  `;
+  
+  document.body.appendChild(toast);
+  
+  // Remove after 4 seconds
+  setTimeout(() => {
+    if (toast.parentNode) {
+      toast.parentNode.removeChild(toast);
+    }
+  }, 4000);
+};
+
 export const LogoutButton: React.FC<LogoutButtonProps> = ({ 
   className = '', 
   children = 'Logout',
@@ -17,83 +47,192 @@ export const LogoutButton: React.FC<LogoutButtonProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const { isAuthenticated } = useAuthStore();
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Only render if authenticated
   if (!isAuthenticated) {
     return null;
   }
 
-  const handleLogout = async () => {
-    if (isLoading) return;
-    
-    setIsLoading(true);
-    
-    try {
-      // Get CSRF token from cookie
-      const getCsrfToken = (): string | null => {
-        if (typeof document === 'undefined') return null;
-        
-        const cookies = document.cookie.split(';');
-        for (let cookie of cookies) {
-          const [name, value] = cookie.trim().split('=');
-          if (name === 'glow_csrf') {
-            return decodeURIComponent(value);
-          }
-        }
-        return null;
-      };
+  // Dev-only telemetry
+  const log = (event: string, data?: any) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[LOGOUT_TELEMETRY] ${event}`, data || '');
+    }
+  };
 
-      const csrfToken = getCsrfToken();
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-      
-      if (csrfToken) {
-        headers['X-CSRF-Token'] = csrfToken;
+  // Get CSRF token from cookie
+  const getCsrfToken = (): string | null => {
+    if (typeof document === 'undefined') return null;
+    
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'glow_csrf') {
+        return decodeURIComponent(value);
       }
+    }
+    return null;
+  };
 
-      console.log('[LOGOUT] Starting logout with CSRF token:', csrfToken ? 'present' : 'missing');
-
-      // Direct API call to logout endpoint
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers,
+  // Fetch fresh CSRF token
+  const fetchCsrfToken = async (signal: AbortSignal): Promise<string | null> => {
+    try {
+      const response = await fetch('/api/auth/csrf', {
+        method: 'GET',
         credentials: 'same-origin',
+        signal,
       });
-
-      console.log('[LOGOUT] Logout response:', response.status, response.ok);
-
+      
       if (response.ok) {
-        // Broadcast logout to other tabs for cross-tab coherence
-        if (typeof window !== 'undefined' && window.BroadcastChannel) {
-          try {
-            const channel = new BroadcastChannel('glow-auth');
-            channel.postMessage({ type: 'LOGOUT' });
-            channel.close();
-            console.log('[LOGOUT] Broadcasted logout to other tabs');
-          } catch (e) {
-            console.warn('[LOGOUT] BroadcastChannel not available:', e);
-          }
-        }
-
-        // Hard navigation to /login (full reload to eliminate router/store races)
-        console.log('[LOGOUT] Hard navigation to /login');
-        window.location.assign('/login');
-      } else {
-        // Handle logout failure
-        const errorData = await response.json().catch(() => ({ error: 'Logout failed' }));
-        console.error('[LOGOUT] Logout failed:', errorData);
-        
-        // Even on failure, try to navigate to login
-        window.location.assign('/login');
+        const data = await response.json();
+        return data.csrf_token || null;
       }
     } catch (error) {
-      console.error('[LOGOUT] Logout error:', error);
+      if (error.name !== 'AbortError') {
+        log('csrf_fetch_error', error);
+      }
+    }
+    return null;
+  };
+
+  // Perform logout request
+  const performLogout = async (csrfToken: string | null, signal: AbortSignal): Promise<boolean> => {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
+
+    const response = await fetch('/api/auth/logout', {
+      method: 'POST',
+      headers,
+      credentials: 'same-origin',
+      signal,
+    });
+
+    if (response.ok) {
+      return true;
+    }
+
+    // Check for CSRF error
+    if (response.status === 403) {
+      try {
+        const errorData = await response.json();
+        if (errorData.code === 'CSRF_MISSING' || errorData.code === 'CSRF_INVALID') {
+          throw new Error('CSRF_ERROR');
+        }
+      } catch (e) {
+        if (e.message === 'CSRF_ERROR') {
+          throw e;
+        }
+      }
+    }
+
+    // Other error
+    const errorData = await response.json().catch(() => ({ error: 'Logout failed' }));
+    throw new Error(`HTTP_${response.status}: ${errorData.error || 'Logout failed'}`);
+  };
+
+  const handleLogout = async () => {
+    // Prevent double-clicks
+    if (isLoading) return;
+    
+    // Check if offline
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      showToast("You're offline. Try again.");
+      log('logout_offline');
+      return;
+    }
+    
+    setIsLoading(true);
+    log('logout_click');
+    
+    // Create abort controller with 5s timeout
+    abortControllerRef.current = new AbortController();
+    const timeoutId = setTimeout(() => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        log('logout_timeout');
+        showToast("Request timed out. Please try again.");
+        setIsLoading(false);
+      }
+    }, 5000);
+
+    const startTime = Date.now();
+    
+    try {
+      log('logout_start', { ts: startTime });
       
-      // On any error, still try to navigate to login
+      let csrfToken = getCsrfToken();
+      let retryAttempted = false;
+      
+      try {
+        // First attempt
+        await performLogout(csrfToken, abortControllerRef.current.signal);
+      } catch (error) {
+        // Handle CSRF error with retry
+        if (error.message === 'CSRF_ERROR' && !retryAttempted) {
+          log('logout_retry_csrf');
+          retryAttempted = true;
+          
+          // Fetch fresh CSRF token
+          const freshToken = await fetchCsrfToken(abortControllerRef.current.signal);
+          if (freshToken) {
+            // Retry with fresh token
+            await performLogout(freshToken, abortControllerRef.current.signal);
+          } else {
+            throw new Error('Failed to refresh CSRF token');
+          }
+        } else {
+          throw error;
+        }
+      }
+      
+      // Success
+      clearTimeout(timeoutId);
+      const latency = Date.now() - startTime;
+      log('logout_ok', { latency_ms: latency });
+      
+      // Broadcast logout to other tabs for cross-tab coherence
+      if (typeof window !== 'undefined' && window.BroadcastChannel) {
+        try {
+          const channel = new BroadcastChannel('glow-auth');
+          channel.postMessage({ type: 'LOGOUT' });
+          channel.close();
+        } catch (e) {
+          // BroadcastChannel not available, continue
+        }
+      }
+
+      // Hard navigation to /login (full reload to eliminate router/store races)
       window.location.assign('/login');
-    } finally {
+      
+    } catch (error) {
+      clearTimeout(timeoutId);
+      
+      if (error.name === 'AbortError') {
+        // Timeout already handled
+        return;
+      }
+      
+      log('logout_fail', { 
+        code: error.message.includes('HTTP_') ? error.message.split(':')[0] : 'NETWORK_ERROR',
+        status: error.message 
+      });
+      
+      // Show user-friendly error
+      if (error.message.includes('HTTP_5')) {
+        showToast("Server error. Please try again.");
+      } else if (error.message.includes('CSRF')) {
+        showToast("Security error. Please refresh and try again.");
+      } else {
+        showToast("Couldn't log you out. Please try again.");
+      }
+      
       setIsLoading(false);
     }
   };
