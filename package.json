@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "auth:guards": "node scripts/auth-guards.cjs",
+    "auth:smoke": "node scripts/auth-smoke.cjs",
+    "auth:check": "npm run auth:guards && npm run auth:smoke",
+    "prebuild": "npm run auth:guards"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
