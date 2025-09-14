@@ -29,11 +29,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const { isAuthenticated, user } = useAuthStore();
   const { refetch: refetchUser } = useCurrentUser();
 
-  // If not initialized yet, show loading
+  // Step 4: Show finite loading until isInitialized, then decide using /me result
   if (!isInitialized || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <span className="ml-2 text-sm text-gray-600">Initializing...</span>
       </div>
     );
   }

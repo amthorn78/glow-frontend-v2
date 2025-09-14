@@ -50,13 +50,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isError 
   } = useCurrentUser();
 
-  // Handle initialization - set to true on ANY resolution
+  // Step 4: Handle initialization - set to true on ANY first resolution (200 or 401)
   useEffect(() => {
     if (isSuccess || isError) {
       const traceEnabled = import.meta.env.VITE_TRACE_AUTH === '1' || true; // Force enable for debugging
       
       if (traceEnabled) {
-        console.log('[STORE] AuthProvider initialization:', {
+        console.log('[STORE] AuthProvider initialization - first resolve:', {
           isSuccess,
           isError,
           hasAuthResult: !!authResult,
@@ -66,11 +66,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         });
       }
       
-      setIsInitialized(true);
-      authStore.setInitialized(true);
-      
-      if (traceEnabled) {
-        console.log('[STORE] isInitialized: false → true');
+      // Step 4: Set isInitialized=true on first resolve (success or error)
+      if (!authStore.isInitialized) {
+        setIsInitialized(true);
+        authStore.setInitialized(true);
+        
+        if (traceEnabled) {
+          console.log('[STORE] isInitialized: false → true (first resolve)');
+        }
       }
     }
   }, [isSuccess, isError, authStore, authResult]);

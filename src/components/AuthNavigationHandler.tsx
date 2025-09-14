@@ -62,7 +62,7 @@ export const AuthNavigationHandler: React.FC = () => {
             if (traceEnabled) {
               console.log(`[NAV_DO-${traceId}] Navigating to returnTo: ${returnTo}`);
             }
-            navigate(returnTo, { replace: true });
+            navigate(returnTo); // Step 3: Drop replace:true for now
             return;
           }
           
@@ -70,7 +70,7 @@ export const AuthNavigationHandler: React.FC = () => {
           if (traceEnabled) {
             console.log(`[NAV_DO-${traceId}] Navigating to dashboard: /dashboard`);
           }
-          navigate('/dashboard', { replace: true });
+          navigate('/dashboard'); // Step 3: Drop replace:true for now
         }
         
         // Handle logout: true → false
@@ -92,7 +92,7 @@ export const AuthNavigationHandler: React.FC = () => {
             if (traceEnabled) {
               console.log(`[NAV_DO-${traceId}] Navigating to login with returnTo: /login?returnTo=${returnTo}`);
             }
-            navigate(`/login?returnTo=${returnTo}`, { replace: true });
+            navigate(`/login?returnTo=${returnTo}`); // Step 3: Drop replace:true for now
             return;
           }
           
@@ -100,7 +100,7 @@ export const AuthNavigationHandler: React.FC = () => {
           if (traceEnabled) {
             console.log(`[NAV_DO-${traceId}] Navigating to login: /login`);
           }
-          navigate('/login', { replace: true });
+          navigate('/login'); // Step 3: Drop replace:true for now
         }
       },
       // Selector: only subscribe to auth-relevant changes
