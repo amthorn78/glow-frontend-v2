@@ -117,7 +117,7 @@ const OnboardingPrompts: React.FC<{ missingSteps: string[] }> = ({ missingSteps 
 
   const stepActions = {
     'magic10': () => navigate('/magic10-setup'),
-    'birthData': () => navigate('/birth-data'),
+    'birthData': () => navigate('/profile#birth-data'),
     'photos': () => navigate('/profile/edit'),
     'bio': () => navigate('/profile/edit')
   };
