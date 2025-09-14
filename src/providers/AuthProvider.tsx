@@ -62,7 +62,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           hasAuthResult: !!authResult,
           auth: authResult?.auth,
           prevInitialized: authStore.isInitialized,
-          nextInitialized: true
+          nextInitialized: true,
+          timestamp: new Date().toISOString()
         });
       }
       
@@ -77,6 +78,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     }
   }, [isSuccess, isError, authStore, authResult]);
+
+  // DEBUGGING: Track all query state changes
+  useEffect(() => {
+    const traceEnabled = import.meta.env.VITE_TRACE_AUTH === '1' || true;
+    if (traceEnabled) {
+      console.log('[DEBUG] AuthProvider query state change:', {
+        isLoading,
+        isSuccess,
+        isError,
+        hasAuthResult: !!authResult,
+        auth: authResult?.auth,
+        hasUser: !!authResult?.user,
+        currentStoreAuth: authStore.isAuthenticated,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, [isLoading, isSuccess, isError, authResult, authStore.isAuthenticated]);
 
   // Handle authentication state from resolved result
   useEffect(() => {
