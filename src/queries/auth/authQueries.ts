@@ -90,7 +90,7 @@ export const useCurrentUser = () => {
 // ============================================================================
 
 /**
- * Login mutation with Auth v2 cookie flow
+ * Login mutation - F3 Auth Handshake Sequencing
  */
 export const useLoginMutation = () => {
   const queryClient = useQueryClient();
@@ -103,67 +103,50 @@ export const useLoginMutation = () => {
     },
 
     onMutate: async (credentials) => {
+      // F3: Log login submit
+      const { logLoginSubmit } = await import('../../utils/authTelemetry');
+      logLoginSubmit(credentials.email);
+      
       // Set loading state
       authStore.setLoading(true);
       authStore.setError(null);
-      return { credentials };
+      return { credentials, startTime: Date.now() };
     },
 
-    onSuccess: async (data, variables) => {
-      const traceEnabled = import.meta.env.VITE_TRACE_AUTH === '1';
+    onSuccess: async (data, variables, context) => {
+      const { isHandshakeEnforced } = await import('../../config/authFlags');
+      const { 
+        logLoginHttp200, 
+        logHandshakeMeInvalidate, 
+        logHandshakeMe200, 
+        logHandshakeMe401, 
+        logHandshakeMeTimeout,
+        logNavigateBegin,
+        logNavigateDone 
+      } = await import('../../utils/authTelemetry');
       
-      if (traceEnabled) {
-        console.log('[MUTATIONS] Login success:', {
+      const loginLatency = Date.now() - (context?.startTime || Date.now());
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[F3_HANDSHAKE] Login HTTP 200 received:', {
           ok: data.ok,
           hasUser: !!data.user,
-          endpoint: '/api/auth/login'
+          latency_ms: loginLatency,
+          handshakeEnforced: isHandshakeEnforced()
         });
       }
       
+      // F3: Log login HTTP 200
+      logLoginHttp200(loginLatency);
+      
       if (data.ok && data.user) {
-        // CRITICAL FIX: Use refetchQueries to trigger AuthProvider hook updates
-        // 1. Invalidate /me query
-        if (traceEnabled) {
-          console.log('[SYNC_NAV] Step 1: Invalidating /me after login');
+        if (isHandshakeEnforced()) {
+          // F3: Auth Handshake Sequencing
+          await performAuthHandshake(queryClient, data.user, variables);
+        } else {
+          // Legacy behavior - direct navigation
+          await legacyLoginSuccess(queryClient, data.user);
         }
-        
-        await queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
-        
-        // 2. Refetch to trigger AuthProvider's useCurrentUser() hook
-        try {
-          if (traceEnabled) {
-            console.log('[SYNC_NAV] Step 2: Refetching /me to trigger AuthProvider hook');
-          }
-          
-          await queryClient.refetchQueries({ 
-            queryKey: authQueryKeys.me,
-            type: 'active' // Only refetch active queries (the AuthProvider hook)
-          });
-          
-          if (traceEnabled) {
-            console.log('[SYNC_NAV] Step 3: Refetch complete - AuthProvider should update store');
-          }
-          
-          // 3. Navigation will be handled by AuthNavigationHandler when store updates
-          if (traceEnabled) {
-            console.log('[SYNC_NAV] Step 4: Waiting for store update to trigger navigation');
-          }
-          
-        } catch (error) {
-          if (traceEnabled) {
-            console.warn('[SYNC_NAV] Failed to refetch /me after login:', error);
-          }
-        }
-
-        // Broadcast login to other tabs
-        if (typeof window !== 'undefined' && window.BroadcastChannel) {
-          const channel = new BroadcastChannel('glow-auth');
-          channel.postMessage({ type: 'LOGIN', user: data.user });
-          channel.close();
-        }
-
-        // Invalidate all auth-related queries
-        await invalidateQueries(queryClient, ['auth']);
       }
     },
 
@@ -176,6 +159,176 @@ export const useLoginMutation = () => {
     },
   });
 };
+
+// F3: Auth Handshake Sequencing Implementation
+async function performAuthHandshake(
+  queryClient: any, 
+  loginUser: any, 
+  credentials: LoginCredentials
+) {
+  const { 
+    logHandshakeMeInvalidate, 
+    logHandshakeMe200, 
+    logHandshakeMe401, 
+    logHandshakeMeTimeout,
+    logNavigateBegin,
+    logNavigateDone 
+  } = await import('../../utils/authTelemetry');
+  
+  const handshakeStartTime = Date.now();
+  const HANDSHAKE_TIMEOUT = 4000; // 4 seconds as per spec
+  
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[F3_HANDSHAKE] Starting auth handshake sequencing...');
+  }
+  
+  try {
+    // Step 1: Invalidate /me query
+    logHandshakeMeInvalidate();
+    await queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[F3_HANDSHAKE] Step 1: /me query invalidated');
+    }
+    
+    // Step 2: Await /me resolution with timeout
+    const handshakePromise = new Promise((resolve, reject) => {
+      const startTime = Date.now();
+      
+      const checkHandshake = async () => {
+        const elapsed = Date.now() - startTime;
+        
+        if (elapsed > HANDSHAKE_TIMEOUT) {
+          // Break-glass: hard reload
+          logHandshakeMeTimeout(elapsed);
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[F3_HANDSHAKE] Timeout reached, performing break-glass hard reload');
+          }
+          
+          // Store returnTo before reload
+          const returnTo = sessionStorage.getItem('auth-returnTo') || '/dashboard';
+          sessionStorage.setItem('auth-returnTo', returnTo);
+          
+          // Hard reload to commit cookies
+          window.location.reload();
+          return;
+        }
+        
+        try {
+          // Check if /me query has resolved
+          const meData = queryClient.getQueryData(authQueryKeys.me);
+          
+          if (meData) {
+            const handshakeLatency = Date.now() - handshakeStartTime;
+            
+            if (meData.auth === 'authenticated' && meData.user) {
+              // Success: /me confirmed authentication
+              logHandshakeMe200(handshakeLatency, meData.user.id);
+              
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[F3_HANDSHAKE] Step 2: /me=200 confirmed, proceeding to navigation');
+              }
+              
+              resolve(meData.user);
+            } else {
+              // Failed: /me returned 401 or unauthenticated
+              logHandshakeMe401(handshakeLatency);
+              
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[F3_HANDSHAKE] Step 2: /me=401, treating as failed login');
+              }
+              
+              reject(new Error('Authentication failed during handshake'));
+            }
+          } else {
+            // Still pending, check again
+            setTimeout(checkHandshake, 100);
+          }
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      // Start checking
+      setTimeout(checkHandshake, 100);
+    });
+    
+    // Wait for handshake resolution
+    const confirmedUser = await handshakePromise;
+    
+    // Step 3: Navigate after confirmed authentication
+    await performPostHandshakeNavigation(confirmedUser);
+    
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[F3_HANDSHAKE] Handshake failed:', error);
+    }
+    
+    // Show error to user
+    const authStore = useAuthStore.getState();
+    authStore.setError('Login failed. Please try again.');
+  }
+}
+
+// F3: Post-handshake navigation
+async function performPostHandshakeNavigation(user: any) {
+  const { logNavigateBegin, logNavigateDone } = await import('../../utils/authTelemetry');
+  
+  // Determine navigation target
+  const returnTo = sessionStorage.getItem('auth-returnTo') || '/dashboard';
+  sessionStorage.removeItem('auth-returnTo');
+  
+  logNavigateBegin(returnTo, 'handshake_success');
+  
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[F3_HANDSHAKE] Step 3: Navigating to:', returnTo);
+  }
+  
+  // Broadcast login to other tabs (only after confirmed /me=200)
+  if (typeof window !== 'undefined' && window.BroadcastChannel) {
+    try {
+      const channel = new BroadcastChannel('glow-auth');
+      channel.postMessage({ type: 'LOGIN', user });
+      channel.close();
+    } catch (e) {
+      // BroadcastChannel not available
+    }
+  }
+  
+  // Hard navigation (AUTH_ROUTER_NAV_ENABLED=false)
+  window.location.assign(returnTo);
+  
+  logNavigateDone(returnTo);
+}
+
+// F3: Legacy login behavior (when handshake is disabled)
+async function legacyLoginSuccess(queryClient: any, user: any) {
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[F3_LEGACY] Using legacy login behavior (handshake disabled)');
+  }
+  
+  // Invalidate and refetch /me query
+  await queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
+  await queryClient.refetchQueries({ 
+    queryKey: authQueryKeys.me,
+    type: 'active'
+  });
+
+  // Broadcast login to other tabs
+  if (typeof window !== 'undefined' && window.BroadcastChannel) {
+    try {
+      const channel = new BroadcastChannel('glow-auth');
+      channel.postMessage({ type: 'LOGIN', user });
+      channel.close();
+    } catch (e) {
+      // BroadcastChannel not available
+    }
+  }
+
+  // Invalidate all auth-related queries
+  await invalidateQueries(queryClient, ['auth']);
+}
 
 /**
  * Register mutation

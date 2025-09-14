@@ -8,6 +8,14 @@ export type AuthBreadcrumb =
   | 'auth.bootstrap.me.start'
   | 'auth.bootstrap.me.200'
   | 'auth.bootstrap.me.401'
+  | 'auth.login.submit'        // F3: New breadcrumb
+  | 'auth.login.http_200'      // F3: New breadcrumb
+  | 'auth.handshake.me_invalidate'  // F3: New breadcrumb
+  | 'auth.handshake.me_200'    // F3: New breadcrumb
+  | 'auth.handshake.me_401'    // F3: New breadcrumb
+  | 'auth.handshake.me_timeout' // F3: New breadcrumb
+  | 'auth.navigate.begin'      // F3: New breadcrumb
+  | 'auth.navigate.done'       // F3: New breadcrumb
   | 'auth.login.success'
   | 'auth.login.me.confirmed'
   | 'auth.login.break_glass.reload'
@@ -174,6 +182,61 @@ export const logGlobal401ExcludedMe = () => {
   });
 };
 
+// F3: Handshake telemetry convenience functions
+export const logLoginSubmit = (email?: string) => {
+  emitAuthBreadcrumb('auth.login.submit', { user_id: email });
+};
+
+export const logLoginHttp200 = (latency_ms: number) => {
+  emitAuthBreadcrumb('auth.login.http_200', { 
+    latency_ms,
+    http_status: 200 
+  });
+};
+
+export const logHandshakeMeInvalidate = () => {
+  emitAuthBreadcrumb('auth.handshake.me_invalidate', { 
+    query_key: '/api/auth/me' 
+  });
+};
+
+export const logHandshakeMe200 = (latency_ms: number, user_id?: string) => {
+  emitAuthBreadcrumb('auth.handshake.me_200', { 
+    latency_ms,
+    user_id,
+    http_status: 200,
+    query_key: '/api/auth/me'
+  });
+};
+
+export const logHandshakeMe401 = (latency_ms: number) => {
+  emitAuthBreadcrumb('auth.handshake.me_401', { 
+    latency_ms,
+    http_status: 401,
+    query_key: '/api/auth/me'
+  });
+};
+
+export const logHandshakeMeTimeout = (timeout_ms: number) => {
+  emitAuthBreadcrumb('auth.handshake.me_timeout', { 
+    latency_ms: timeout_ms,
+    error_code: 'handshake_timeout'
+  });
+};
+
+export const logNavigateBegin = (target_route: string, reason: string) => {
+  emitAuthBreadcrumb('auth.navigate.begin', { 
+    route: target_route,
+    error_code: reason 
+  });
+};
+
+export const logNavigateDone = (target_route: string) => {
+  emitAuthBreadcrumb('auth.navigate.done', { 
+    route: target_route 
+  });
+};
+
 // Development helper to test breadcrumb system
 export const testBreadcrumbs = () => {
   if (process.env.NODE_ENV === 'development') {
@@ -201,6 +264,15 @@ export default {
   logPersistHydrationBlocked,
   logGlobal401Intercepted,
   logGlobal401ExcludedMe,
+  // F3: Add handshake functions to exports
+  logLoginSubmit,
+  logLoginHttp200,
+  logHandshakeMeInvalidate,
+  logHandshakeMe200,
+  logHandshakeMe401,
+  logHandshakeMeTimeout,
+  logNavigateBegin,
+  logNavigateDone,
   testBreadcrumbs,
 };
 

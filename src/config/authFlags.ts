@@ -9,6 +9,7 @@ interface AuthFlags {
   AUTH_BREADCRUMBS_ENABLED: boolean;
   AUTH_GLOBAL401_EXCLUDE_ME: boolean;
   AUTH_LOGIN_HANDSHAKE_ENFORCED: boolean;
+  AUTH_HANDSHAKE_ENFORCED: boolean; // F3: New flag for handshake sequencing
   AUTH_TELEMETRY_SAMPLING: number;
   AUTH_CANARY_PERCENT: number;
 }
@@ -35,6 +36,9 @@ const DEFAULT_FLAGS: AuthFlags = {
   
   // Login → wait for confirmed /me(200) → then navigate
   AUTH_LOGIN_HANDSHAKE_ENFORCED: true,
+  
+  // F3: Auth handshake sequencing enforced by default
+  AUTH_HANDSHAKE_ENFORCED: true,
   
   // Breadcrumb sampling rate (dev=1.0, staging=0.5, prod≈0.1)
   AUTH_TELEMETRY_SAMPLING: process.env.NODE_ENV === 'development' ? 1.0 : 
@@ -73,6 +77,7 @@ export const isPersistBarrierEnabled = (): boolean => getAuthFlag('AUTH_PERSIST_
 export const isBreadcrumbsEnabled = (): boolean => getAuthFlag('AUTH_BREADCRUMBS_ENABLED');
 export const isGlobal401ExcludeMe = (): boolean => getAuthFlag('AUTH_GLOBAL401_EXCLUDE_ME');
 export const isLoginHandshakeEnforced = (): boolean => getAuthFlag('AUTH_LOGIN_HANDSHAKE_ENFORCED');
+export const isHandshakeEnforced = (): boolean => getAuthFlag('AUTH_HANDSHAKE_ENFORCED'); // F3: New convenience function
 export const getTelemetrySampling = (): number => getAuthFlag('AUTH_TELEMETRY_SAMPLING');
 export const getCanaryPercent = (): number => getAuthFlag('AUTH_CANARY_PERCENT');
 
@@ -96,6 +101,7 @@ export const getAllAuthFlags = (): AuthFlags => ({
   AUTH_BREADCRUMBS_ENABLED: getAuthFlag('AUTH_BREADCRUMBS_ENABLED'),
   AUTH_GLOBAL401_EXCLUDE_ME: getAuthFlag('AUTH_GLOBAL401_EXCLUDE_ME'),
   AUTH_LOGIN_HANDSHAKE_ENFORCED: getAuthFlag('AUTH_LOGIN_HANDSHAKE_ENFORCED'),
+  AUTH_HANDSHAKE_ENFORCED: getAuthFlag('AUTH_HANDSHAKE_ENFORCED'), // F3: Include new flag
   AUTH_TELEMETRY_SAMPLING: getAuthFlag('AUTH_TELEMETRY_SAMPLING'),
   AUTH_CANARY_PERCENT: getAuthFlag('AUTH_CANARY_PERCENT'),
 });
@@ -116,6 +122,7 @@ export default {
   isBreadcrumbsEnabled,
   isGlobal401ExcludeMe,
   isLoginHandshakeEnforced,
+  isHandshakeEnforced, // F3: Add to exports
   getTelemetrySampling,
   getCanaryPercent,
   assertHardNavOnly,
