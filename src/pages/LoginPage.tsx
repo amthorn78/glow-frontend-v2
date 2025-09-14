@@ -21,6 +21,9 @@ const LoginPage: React.FC = () => {
       const response = await loginMutation.mutateAsync(formData);
       
       if (response.ok) {
+        // Wait for auth state to be updated before navigating
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         // Get returnTo from URL params
         const searchParams = new URLSearchParams(location.search);
         const returnTo = searchParams.get('returnTo');
