@@ -17,9 +17,11 @@ interface BirthDataFormCanonicalProps {
 
 interface BirthDataFormData {
   date: string;      // YYYY-MM-DD (ISO format)
-  time: string;      // HH:MM:SS (24h format)
+  time: string;      // HH:MM (24h format, no seconds)
   timezone: string;  // IANA timezone
-  location: string;  // Free text location (optional)
+  location: string;  // Free text location (REQUIRED for HD)
+  latitude: number | null;   // Geocoded latitude (required for HD)
+  longitude: number | null;  // Geocoded longitude (required for HD)
 }
 
 const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
@@ -36,8 +38,13 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
     date: '',
     time: '',
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Default to user's timezone
-    location: ''
+    location: '',
+    latitude: null,
+    longitude: null
   });
+  
+  const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -52,7 +59,9 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
         date: birthData.date || '',
         time: birthData.time || '',
         timezone: birthData.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-        location: birthData.location || ''
+        location: birthData.location || '',
+        latitude: birthData.latitude || null,
+        longitude: birthData.longitude || null
       });
     }
   }, [currentUser]);
@@ -81,6 +90,32 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
     'Pacific/Auckland'
   ];
 
+  // Location search with debouncing (OpenStreetMap geocoding)
+  useEffect(() => {
+    if (formData.location.length < 3) {
+      setLocationSuggestions([]);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setIsLoadingLocation(true);
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(formData.location)}&limit=5&addressdetails=1`
+        );
+        const data = await response.json();
+        setLocationSuggestions(data);
+      } catch (error) {
+        console.error('Location search error:', error);
+        setLocationSuggestions([]);
+      } finally {
+        setIsLoadingLocation(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.location]);
+
   // Validate form data
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
@@ -99,11 +134,11 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
       }
     }
 
-    // Validate time (HH:MM or HH:MM:SS format)
+    // Validate time (HH:MM format only, no seconds)
     if (!formData.time) {
       newErrors.time = 'Time is required';
-    } else if (!/^([01]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/.test(formData.time)) {
-      newErrors.time = 'Time must be in HH:MM or HH:MM:SS format';
+    } else if (!/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(formData.time)) {
+      newErrors.time = 'Time must be in HH:MM format';
     }
 
     // Validate timezone (required IANA)
@@ -111,20 +146,25 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
       newErrors.timezone = 'Timezone is required';
     }
 
-    // Location is optional - no validation needed
-    // Lat/lng are not displayed and not required (FEAT_GEO=false)
+    // Location validation (REQUIRED for Human Design)
+    if (!formData.location.trim()) {
+      newErrors.location = 'Birth location is required for Human Design calculations';
+    }
+
+    // Coordinates validation (REQUIRED for Human Design)
+    if (!formData.latitude || !formData.longitude) {
+      newErrors.coordinates = 'Please select a location from the suggestions to get coordinates';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Normalize time to HH:MM:SS format for server
+  // Normalize time to HH:MM:SS format for server (from HH:MM input)
   const normalizeTime = (time: string): string => {
-    if (time.includes(':')) {
-      const parts = time.split(':');
-      if (parts.length === 2) {
-        return `${parts[0]}:${parts[1]}:00`;
-      }
+    // Input is HH:MM, server expects HH:MM:SS
+    if (time && time.includes(':') && time.split(':').length === 2) {
+      return `${time}:00`;
     }
     return time;
   };
@@ -146,15 +186,14 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
         has_location: !!formData.location
       });
 
-      // Prepare data for API (normalize time to HH:MM:SS, trim location)
+      // Prepare data for API (normalize time to HH:MM:SS, include coordinates)
       const birthDataPayload = {
         date: formData.date,
         time: normalizeTime(formData.time),
         timezone: formData.timezone,
-        location: formData.location.trim() || null,
-        // Note: lat/lng not included (FEAT_GEO=false)
-        latitude: null,
-        longitude: null
+        location: formData.location.trim(),
+        latitude: formData.latitude,
+        longitude: formData.longitude
       };
 
       emitAuthBreadcrumb('api.birth.put.request', {
@@ -206,6 +245,18 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Handle location selection from suggestions
+  const handleLocationSelect = (suggestion: any) => {
+    setFormData(prev => ({
+      ...prev,
+      location: suggestion.display_name,
+      latitude: parseFloat(suggestion.lat),
+      longitude: parseFloat(suggestion.lon)
+    }));
+    setLocationSuggestions([]);
+    setErrors(prev => ({ ...prev, location: '', coordinates: '' }));
   };
 
   if (isLoadingUser) {
@@ -268,7 +319,6 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
           </label>
           <input
             type="time"
-            step="1"
             value={formData.time}
             onChange={(e) => setFormData(prev => ({ ...prev, time: e.target.value }))}
             className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 ${
@@ -306,19 +356,50 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
         {/* Birth Location */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Birth Location
+            Birth Location <span className="text-red-500">*</span>
           </label>
-          <input
-            type="text"
-            value={formData.location}
-            onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-            placeholder="City, State/Province, Country (optional)"
-            maxLength={255}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-            disabled={isSubmitting}
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={formData.location}
+              onChange={(e) => {
+                setFormData(prev => ({ ...prev, location: e.target.value }));
+                setErrors(prev => ({ ...prev, location: '', coordinates: '' }));
+              }}
+              placeholder="Enter city, state/province, country"
+              maxLength={255}
+              className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 ${
+                errors.location || errors.coordinates ? 'border-red-500' : 'border-gray-300'
+              }`}
+              disabled={isSubmitting}
+            />
+            
+            {/* Location Suggestions */}
+            {locationSuggestions.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {locationSuggestions.map((suggestion, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => handleLocationSelect(suggestion)}
+                    className="w-full text-left p-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                  >
+                    <div className="text-sm text-gray-800">{suggestion.display_name}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+            
+            {isLoadingLocation && (
+              <div className="absolute right-3 top-3">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500"></div>
+              </div>
+            )}
+          </div>
+          {errors.location && <p className="text-red-500 text-xs mt-1">{errors.location}</p>}
+          {errors.coordinates && <p className="text-red-500 text-xs mt-1">{errors.coordinates}</p>}
           <p className="text-gray-500 text-xs mt-1">
-            Optional - used for timezone validation and future features
+            Required for Human Design calculations - select from suggestions for coordinates
           </p>
         </div>
 
