@@ -20,48 +20,58 @@ jobs:
 
       - name: Test Auth Contracts
         run: |
-          # Health check
+          # Set canonical base URL
+          BASE=https://www.glowme.io
+          
+          # Health check with redirect following
           echo "Testing /api/health..."
-          HEALTH_RESPONSE=$(curl -s -w "%{http_code}:%{content_type}" https://www.glowme.io/api/health)
-          HTTP_CODE=$(echo $HEALTH_RESPONSE | cut -d: -f1)
-          CONTENT_TYPE=$(echo $HEALTH_RESPONSE | cut -d: -f2)
+          curl -L -sS -D /tmp/health_headers.txt -o /tmp/health.json "${BASE}/api/health"
+          HTTP_CODE=$(awk 'toupper($1)=="HTTP/"{c=$2} END{print c}' /tmp/health_headers.txt)
+          CONTENT_TYPE=$(awk -F': ' 'tolower($1)=="content-type"{print tolower($2)}' /tmp/health_headers.txt | tail -1)
           
           if [ "$HTTP_CODE" != "200" ]; then
             echo "❌ Health check failed: HTTP $HTTP_CODE"
+            cat /tmp/health_headers.txt
             exit 1
           fi
           
-          if [[ "$CONTENT_TYPE" != *"application/json"* ]]; then
-            echo "❌ Health check returned non-JSON: $CONTENT_TYPE"
-            exit 1
-          fi
+          case "$CONTENT_TYPE" in
+            application/json* ) ;;
+            * ) echo "❌ Health check returned non-JSON: $CONTENT_TYPE"; exit 1 ;;
+          esac
           
           echo "✅ Health check passed"
 
-          # Login contract test
+          # Login contract test with cookie jar
           echo "Testing /api/auth/login contract..."
-          LOGIN_RESPONSE=$(curl -s -i -X POST https://www.glowme.io/api/auth/login \
+          JAR=/tmp/cookies.txt
+          curl -L -sS -c "$JAR" -D /tmp/login_headers.txt -o /tmp/login.json \
             -H 'Content-Type: application/json' \
-            --data '{"email":"admin@glow.app","password":"admin123"}')
+            -X POST "${BASE}/api/auth/login" \
+            --data '{"email":"admin@glow.app","password":"admin123"}'
+          
+          LOGIN_CODE=$(awk 'toupper($1)=="HTTP/"{c=$2} END{print c}' /tmp/login_headers.txt)
+          LOGIN_CTYPE=$(awk -F': ' 'tolower($1)=="content-type"{print tolower($2)}' /tmp/login_headers.txt | tail -1)
           
           # Check for 200 status
-          if ! echo "$LOGIN_RESPONSE" | grep -q "HTTP/.*200"; then
-            echo "❌ Login failed - not 200 status"
-            echo "$LOGIN_RESPONSE"
+          if [ "$LOGIN_CODE" != "200" ]; then
+            echo "❌ Login failed - HTTP $LOGIN_CODE"
+            cat /tmp/login_headers.txt
             exit 1
           fi
           
           # Check for JSON content type
-          if ! echo "$LOGIN_RESPONSE" | grep -q "content-type:.*application/json"; then
-            echo "❌ Login returned non-JSON response"
-            exit 1
-          fi
+          case "$LOGIN_CTYPE" in
+            application/json* ) ;;
+            * ) echo "❌ Login returned non-JSON: $LOGIN_CTYPE"; exit 1 ;;
+          esac
           
           # Check for required cookie attributes
-          COOKIE_LINE=$(echo "$LOGIN_RESPONSE" | grep -i "set-cookie:" | head -1)
+          COOKIE_LINE=$(grep -i '^set-cookie:' /tmp/login_headers.txt | grep -i 'glow_session=' | tail -1)
           
           if [[ -z "$COOKIE_LINE" ]]; then
-            echo "❌ No Set-Cookie header found"
+            echo "❌ No glow_session cookie found"
+            cat /tmp/login_headers.txt
             exit 1
           fi
           
@@ -87,69 +97,64 @@ jobs:
           
           echo "✅ Login contract passed"
           
-          # Extract cookie for authenticated tests
-          COOKIE=$(echo "$COOKIE_LINE" | sed 's/.*set-cookie: *\([^;]*\).*/\1/i')
-          
-          # Test /me with cookie (authenticated)
+          # Test /me with cookie jar (authenticated)
           echo "Testing /api/auth/me (authenticated)..."
-          ME_AUTH_RESPONSE=$(curl -s -w "%{http_code}:%{content_type}" \
-            -H "Cookie: $COOKIE" \
-            https://www.glowme.io/api/auth/me)
+          curl -L -sS -b "$JAR" -D /tmp/me_headers.txt -o /tmp/me.json "${BASE}/api/auth/me"
           
-          ME_HTTP_CODE=$(echo $ME_AUTH_RESPONSE | cut -d: -f1)
-          ME_CONTENT_TYPE=$(echo $ME_AUTH_RESPONSE | cut -d: -f2)
+          ME_HTTP_CODE=$(awk 'toupper($1)=="HTTP/"{c=$2} END{print c}' /tmp/me_headers.txt)
+          ME_CONTENT_TYPE=$(awk -F': ' 'tolower($1)=="content-type"{print tolower($2)}' /tmp/me_headers.txt | tail -1)
           
           if [ "$ME_HTTP_CODE" != "200" ]; then
             echo "❌ /me authenticated failed: HTTP $ME_HTTP_CODE"
+            cat /tmp/me_headers.txt
             exit 1
           fi
           
-          if [[ "$ME_CONTENT_TYPE" != *"application/json"* ]]; then
-            echo "❌ /me authenticated returned non-JSON: $ME_CONTENT_TYPE"
-            exit 1
-          fi
+          case "$ME_CONTENT_TYPE" in
+            application/json* ) ;;
+            * ) echo "❌ /me authenticated returned non-JSON: $ME_CONTENT_TYPE"; exit 1 ;;
+          esac
           
           echo "✅ /me authenticated passed"
           
           # Test logout
           echo "Testing /api/auth/logout..."
-          LOGOUT_RESPONSE=$(curl -s -w "%{http_code}:%{content_type}" \
-            -X POST \
-            -H "Cookie: $COOKIE" \
-            https://www.glowme.io/api/auth/logout)
+          curl -L -sS -b "$JAR" -D /tmp/logout_headers.txt -o /tmp/logout.json \
+            -X POST "${BASE}/api/auth/logout"
           
-          LOGOUT_HTTP_CODE=$(echo $LOGOUT_RESPONSE | cut -d: -f1)
-          LOGOUT_CONTENT_TYPE=$(echo $LOGOUT_RESPONSE | cut -d: -f2)
+          LOGOUT_HTTP_CODE=$(awk 'toupper($1)=="HTTP/"{c=$2} END{print c}' /tmp/logout_headers.txt)
+          LOGOUT_CONTENT_TYPE=$(awk -F': ' 'tolower($1)=="content-type"{print tolower($2)}' /tmp/logout_headers.txt | tail -1)
           
           if [ "$LOGOUT_HTTP_CODE" != "200" ]; then
             echo "❌ Logout failed: HTTP $LOGOUT_HTTP_CODE"
+            cat /tmp/logout_headers.txt
             exit 1
           fi
           
-          if [[ "$LOGOUT_CONTENT_TYPE" != *"application/json"* ]]; then
-            echo "❌ Logout returned non-JSON: $LOGOUT_CONTENT_TYPE"
-            exit 1
-          fi
+          case "$LOGOUT_CONTENT_TYPE" in
+            application/json* ) ;;
+            * ) echo "❌ Logout returned non-JSON: $LOGOUT_CONTENT_TYPE"; exit 1 ;;
+          esac
           
           echo "✅ Logout passed"
           
           # Test /me without cookie (unauthenticated)
           echo "Testing /api/auth/me (unauthenticated)..."
-          ME_UNAUTH_RESPONSE=$(curl -s -w "%{http_code}:%{content_type}" \
-            https://www.glowme.io/api/auth/me)
+          curl -L -sS -D /tmp/me2_headers.txt -o /tmp/me2.json "${BASE}/api/auth/me"
           
-          ME_UNAUTH_HTTP_CODE=$(echo $ME_UNAUTH_RESPONSE | cut -d: -f1)
-          ME_UNAUTH_CONTENT_TYPE=$(echo $ME_UNAUTH_RESPONSE | cut -d: -f2)
+          ME_UNAUTH_HTTP_CODE=$(awk 'toupper($1)=="HTTP/"{c=$2} END{print c}' /tmp/me2_headers.txt)
+          ME_UNAUTH_CONTENT_TYPE=$(awk -F': ' 'tolower($1)=="content-type"{print tolower($2)}' /tmp/me2_headers.txt | tail -1)
           
           if [ "$ME_UNAUTH_HTTP_CODE" != "401" ]; then
             echo "❌ /me unauthenticated should return 401, got: HTTP $ME_UNAUTH_HTTP_CODE"
+            cat /tmp/me2_headers.txt
             exit 1
           fi
           
-          if [[ "$ME_UNAUTH_CONTENT_TYPE" != *"application/json"* ]]; then
-            echo "❌ /me unauthenticated returned non-JSON: $ME_UNAUTH_CONTENT_TYPE"
-            exit 1
-          fi
+          case "$ME_UNAUTH_CONTENT_TYPE" in
+            application/json* ) ;;
+            * ) echo "❌ /me unauthenticated returned non-JSON: $ME_UNAUTH_CONTENT_TYPE"; exit 1 ;;
+          esac
           
           echo "✅ /me unauthenticated passed"
           echo "🎉 All auth contracts validated successfully!"

@@ -25,6 +25,7 @@ import DiscoveryPage from './pages/DiscoveryPage';
 // Components
 import { ModalRoot } from './components/modals';
 import { NotificationContainer } from './components/notifications';
+import { GlobalMenu } from './components/GlobalMenu';
 import ThemeTestComponent from './components/ThemeTestComponent';
 
 import './App.css';
@@ -157,6 +158,7 @@ const AppRoutes: React.FC = () => {
       </Routes>
       
       {/* Global Components */}
+      <GlobalMenu />
       <ModalRoot />
       <NotificationContainer />
     </Router>

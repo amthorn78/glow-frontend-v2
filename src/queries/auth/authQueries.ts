@@ -193,15 +193,63 @@ export const useLogoutMutation = () => {
         channel.close();
       }
 
-      // Clear all cached data
-      queryClient.clear();
+      // Only invalidate auth queries, not entire cache (T-UI-001 spec)
+      await queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
     },
 
     onError: (error: any) => {
       console.error('Logout error:', error);
       // Clear local state even if API call fails
       authStore.logout();
-      queryClient.clear();
+      // Only invalidate auth queries, not entire cache (T-UI-001 spec)
+      queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
+    },
+
+    onSettled: () => {
+      authStore.setLoading(false);
+    },
+  });
+};
+
+/**
+ * Logout All Sessions mutation - T-UI-001
+ */
+export const useLogoutAllMutation = () => {
+  const queryClient = useQueryClient();
+  const authStore = useAuthStore();
+
+  return useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.logoutAll();
+      return response.data;
+    },
+
+    onMutate: async () => {
+      authStore.setLoading(true);
+      return {};
+    },
+
+    onSuccess: async (data) => {
+      // Clear local state
+      authStore.logout();
+
+      // Broadcast logout to other tabs
+      if (typeof window !== 'undefined' && window.BroadcastChannel) {
+        const channel = new BroadcastChannel('glow-auth');
+        channel.postMessage({ type: 'LOGOUT' });
+        channel.close();
+      }
+
+      // Only invalidate auth queries, not entire cache (T-UI-001 spec)
+      await queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
+    },
+
+    onError: (error: any) => {
+      console.error('Logout all error:', error);
+      // Clear local state even if API call fails
+      authStore.logout();
+      // Only invalidate auth queries, not entire cache (T-UI-001 spec)
+      queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
     },
 
     onSettled: () => {
@@ -370,7 +418,8 @@ export const useDeleteAccountMutation = () => {
       if (data.success) {
         // Clear all state and redirect
         authStore.logout();
-        queryClient.clear();
+        // Only invalidate auth queries, not entire cache (T-UI-001 spec)
+        await queryClient.invalidateQueries({ queryKey: authQueryKeys.me });
         
         // Broadcast logout to other tabs
         if (typeof window !== 'undefined' && window.BroadcastChannel) {
