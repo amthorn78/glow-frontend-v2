@@ -1,8 +1,10 @@
-// Enhanced Logout Button - T-UI-001 Phase 4
-// Essentials-only UX improvements with guardrails
+// Enhanced Logout Button - T-UI-001 Phase 5
+// Router navigation with feature flag fallback to hard navigation
 
 import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import { isRouterNavEnabled, logFeatureFlag } from '../utils/featureFlags';
 
 interface LogoutButtonProps {
   className?: string;
@@ -47,6 +49,7 @@ export const LogoutButton: React.FC<LogoutButtonProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const { isAuthenticated } = useAuthStore();
+  const navigate = useNavigate();
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Only render if authenticated
@@ -208,8 +211,24 @@ export const LogoutButton: React.FC<LogoutButtonProps> = ({
         }
       }
 
-      // Hard navigation to /login (full reload to eliminate router/store races)
-      window.location.assign('/login');
+      // Phase 5: Router navigation with feature flag fallback
+      const useRouterNav = isRouterNavEnabled();
+      logFeatureFlag('ROUTER_NAV_ENABLED', 'logout_success');
+      
+      if (useRouterNav) {
+        try {
+          log('auth.logout.seq', { route: 'router' });
+          navigate('/login', { replace: true });
+        } catch (error) {
+          // Fallback to hard navigation if router fails
+          log('auth.logout.seq', { route: 'hard', reason: 'router_error' });
+          window.location.assign('/login');
+        }
+      } else {
+        // Hard navigation (Phase 4 behavior)
+        log('auth.logout.seq', { route: 'hard', reason: 'feature_flag_disabled' });
+        window.location.assign('/login');
+      }
       
     } catch (error) {
       clearTimeout(timeoutId);
