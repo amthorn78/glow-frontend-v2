@@ -5,6 +5,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useAuthContext } from '../providers/AuthProvider';
+import { AuthenticatedLayout } from './AuthenticatedLayout';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -59,8 +60,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Render protected content
-  return <>{children}</>;
+  // Render protected content wrapped in AuthenticatedLayout
+  return <AuthenticatedLayout>{children}</AuthenticatedLayout>;
 };
 
 export default ProtectedRoute;
