@@ -211,6 +211,24 @@ class ApiClient {
   }
 
   // ============================================================================
+  // CSRF TOKEN HELPER
+  // ============================================================================
+
+  private getCsrfToken(): string | null {
+    if (typeof document === 'undefined') return null;
+    
+    // Get CSRF token from cookie
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'glow_csrf') {
+        return decodeURIComponent(value);
+      }
+    }
+    return null;
+  }
+
+  // ============================================================================
   // AUTHENTICATION ENDPOINTS - AUTH v2
   // ============================================================================
 
@@ -225,12 +243,42 @@ class ApiClient {
   }
 
   async logout(): Promise<ApiResponse<{ ok: boolean }>> {
-    const response = await this.post<{ ok: boolean }>('/api/auth/logout');
+    const csrfToken = this.getCsrfToken();
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
+    
+    console.log('[DEBUG] Logout with CSRF token:', csrfToken ? 'present' : 'missing');
+    
+    const response = await this.request<{ ok: boolean }>('/api/auth/logout', {
+      method: 'POST',
+      headers,
+    });
     return response;
   }
 
   async logoutAll(): Promise<ApiResponse<{ ok: boolean; revoked_count: number; self_revoked: boolean }>> {
-    const response = await this.post<{ ok: boolean; revoked_count: number; self_revoked: boolean }>('/api/auth/logout-all');
+    const csrfToken = this.getCsrfToken();
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
+    
+    console.log('[DEBUG] Logout-all with CSRF token:', csrfToken ? 'present' : 'missing');
+    
+    const response = await this.request<{ ok: boolean; revoked_count: number; self_revoked: boolean }>('/api/auth/logout-all', {
+      method: 'POST',
+      headers,
+    });
     return response;
   }
 
