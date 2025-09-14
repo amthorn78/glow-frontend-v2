@@ -27,7 +27,9 @@ export type AuthBreadcrumb =
   | 'auth.persist.hydration.complete'
   | 'auth.persist.hydration.blocked'
   | 'auth.global401.intercepted'
-  | 'auth.global401.excluded_me';
+  | 'auth.global401.excluded_me'
+  | 'auth.interceptor.401'        // F5: New breadcrumb
+  | 'auth.interceptor.redirect';  // F5: New breadcrumb
 
 // Breadcrumb data fields per specification
 interface BreadcrumbData {
@@ -237,6 +239,20 @@ export const logNavigateDone = (target_route: string) => {
   });
 };
 
+// F5: Global 401 interceptor telemetry convenience functions
+export const logInterceptor401 = (path: string, status: number) => {
+  emitAuthBreadcrumb('auth.interceptor.401', { 
+    route: path,
+    http_status: status 
+  });
+};
+
+export const logInterceptorRedirect = (returnTo: string) => {
+  emitAuthBreadcrumb('auth.interceptor.redirect', { 
+    route: returnTo 
+  });
+};
+
 // Development helper to test breadcrumb system
 export const testBreadcrumbs = () => {
   if (process.env.NODE_ENV === 'development') {
@@ -273,6 +289,9 @@ export default {
   logHandshakeMeTimeout,
   logNavigateBegin,
   logNavigateDone,
+  // F5: Add interceptor functions to exports
+  logInterceptor401,
+  logInterceptorRedirect,
   testBreadcrumbs,
 };
 

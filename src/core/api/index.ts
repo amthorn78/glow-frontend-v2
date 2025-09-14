@@ -110,10 +110,9 @@ class ApiClient {
 
       console.log(`[TRACE] fetch ← ${response.status} ${url} {ct: ${contentType}, preview: ${JSON.stringify(data).substring(0, 100)}}`);
 
-      // Global 401 handler for JSON responses (exclude /me endpoint)
-      if (response.status === 401 && !url.includes('/api/auth/me')) {
-        this.handleUnauthorized();
-        throw new Error(data.error || 'Authentication required');
+      // F5: Global 401 interceptor with feature flag and exempt paths
+      if (response.status === 401) {
+        await this.handleGlobal401(url, response.status);
       }
 
       if (!response.ok) {
@@ -146,26 +145,67 @@ class ApiClient {
   }
 
   // ============================================================================
-  // GLOBAL 401 HANDLER
+  // F5: GLOBAL 401 INTERCEPTOR (Enhanced)
   // ============================================================================
 
-  private handleUnauthorized(): void {
-    // Clear any local auth state
-    if (typeof window !== 'undefined') {
-      // Broadcast logout to other tabs
-      try {
-        const channel = new BroadcastChannel('glow-auth');
-        channel.postMessage({ type: 'LOGOUT' });
-        channel.close();
-      } catch (e) {
-        console.warn('BroadcastChannel not available');
-      }
-
-      // Redirect to login with returnTo
-      const currentPath = window.location.pathname + window.location.search;
-      const returnTo = encodeURIComponent(currentPath);
-      window.location.href = `/login?returnTo=${returnTo}`;
+  private async handleGlobal401(url: string, status: number): Promise<void> {
+    // Dynamic imports to avoid circular dependencies
+    const { isGlobal401Enabled, AUTH_GLOBAL_401_EXEMPT_PATHS } = await import('../../config/authFlags');
+    const { logInterceptor401, logInterceptorRedirect, logGlobal401ExcludedMe } = await import('../../utils/authTelemetry');
+    
+    // Check if global 401 interceptor is enabled
+    if (!isGlobal401Enabled()) {
+      return; // Feature disabled
     }
+    
+    // Check if this path is exempt from global 401 handling
+    const isExemptPath = AUTH_GLOBAL_401_EXEMPT_PATHS.some(exemptPath => url.includes(exemptPath));
+    
+    if (isExemptPath) {
+      // Log exemption and return without intercepting
+      logGlobal401ExcludedMe();
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[F5_GLOBAL_401] Path ${url} is exempt from global 401 handling`);
+      }
+      
+      return; // Don't intercept exempt paths
+    }
+    
+    // Log 401 interception
+    logInterceptor401(url, status);
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[F5_GLOBAL_401] Intercepting 401 for ${url}, redirecting to login`);
+    }
+    
+    // Clear auth store
+    try {
+      const { useAuthStore } = await import('../../stores/authStore');
+      const authStore = useAuthStore.getState();
+      authStore.clearAuth();
+    } catch (error) {
+      console.warn('[F5_GLOBAL_401] Failed to clear auth store:', error);
+    }
+    
+    // Determine returnTo URL
+    const currentPath = window.location.pathname + window.location.search;
+    const returnTo = currentPath !== '/login' ? encodeURIComponent(currentPath) : '';
+    const loginUrl = returnTo ? `/login?returnTo=${returnTo}` : '/login';
+    
+    // Log redirect
+    logInterceptorRedirect(loginUrl);
+    
+    // Hard navigation to login
+    window.location.assign(loginUrl);
+    
+    // Throw error to prevent further processing
+    throw new Error('Authentication required');
+  }
+
+  private handleUnauthorized(): void {
+    // Legacy method - now delegates to handleGlobal401
+    this.handleGlobal401(window.location.pathname, 401).catch(console.error);
   }
 
   // ============================================================================
