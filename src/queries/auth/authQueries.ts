@@ -34,17 +34,18 @@ export const useCurrentUser = () => {
   return useQuery({
     queryKey: authQueryKeys.me,
     queryFn: async () => {
-      const traceEnabled = import.meta.env.VITE_TRACE_AUTH === '1';
+      const traceId = Math.random().toString(36).substr(2, 8);
+      const traceEnabled = import.meta.env.VITE_TRACE_AUTH === '1' || true; // Force enable for debugging
       
       if (traceEnabled) {
-        console.log('[BOOTSTRAP] /api/auth/me probe starting...');
+        console.log(`[BOOTSTRAP-${traceId}] START: /api/auth/me probe starting...`);
       }
       
       try {
         const response = await apiClient.getCurrentUser();
         
         if (traceEnabled) {
-          console.log('[BOOTSTRAP] /api/auth/me response:', {
+          console.log(`[BOOTSTRAP-${traceId}] RESPONSE: /api/auth/me`, {
             status: response.status,
             auth: response.data.auth,
             hasUser: !!response.data.user
@@ -54,14 +55,14 @@ export const useCurrentUser = () => {
         // Always resolves - never throws
         if (response.data.auth === 'authenticated' && response.data.user) {
           if (traceEnabled) {
-            console.log('[BOOTSTRAP] Branch: authenticated');
+            console.log(`[BOOTSTRAP-${traceId}] END: Branch authenticated`);
           }
           
           // F3: Do not write directly to store - let AuthProvider handle it
           return { auth: 'authenticated', user: response.data.user };
         } else {
           if (traceEnabled) {
-            console.log('[BOOTSTRAP] Branch: unauthenticated');
+            console.log(`[BOOTSTRAP-${traceId}] END: Branch unauthenticated`);
           }
           
           // F3: Do not write directly to store - let AuthProvider handle it
@@ -69,7 +70,7 @@ export const useCurrentUser = () => {
         }
       } catch (error) {
         if (traceEnabled) {
-          console.log('[BOOTSTRAP] /api/auth/me error:', error);
+          console.log(`[BOOTSTRAP-${traceId}] ERROR: /api/auth/me error:`, error);
         }
         
         // F3: Do not write directly to store - let AuthProvider handle it

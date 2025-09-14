@@ -18,21 +18,29 @@ export const AuthNavigationHandler: React.FC = () => {
     }
 
     console.log('[DEBUG] AuthNavigationHandler: Setting up subscription');
-    const traceEnabled = true; // Force enable for debugging
+    const traceEnabled = import.meta.env.VITE_TRACE_AUTH === '1' || true; // Force enable for debugging
 
     // F1: Subscribe to auth store changes for navigation
     const unsubscribe = useAuthStore.subscribe(
       (state, prevState) => {
-        console.log('[DEBUG] Store subscription fired:', {
+        const traceId = Math.random().toString(36).substr(2, 8);
+        
+        console.log(`[DEBUG-${traceId}] Store subscription fired:`, {
           from: { isAuthenticated: prevState.isAuthenticated },
           to: { isAuthenticated: state.isAuthenticated },
           location: location.pathname
         });
 
         if (traceEnabled) {
-          console.log('[STORE] Auth state transition:', {
-            from: { isAuthenticated: prevState.isAuthenticated },
-            to: { isAuthenticated: state.isAuthenticated },
+          console.log(`[STORE-${traceId}] Auth state transition:`, {
+            from: { 
+              isAuthenticated: prevState.isAuthenticated,
+              isInitialized: prevState.isInitialized 
+            },
+            to: { 
+              isAuthenticated: state.isAuthenticated,
+              isInitialized: state.isInitialized 
+            },
             reason: 'store_subscription'
           });
         }
@@ -40,9 +48,10 @@ export const AuthNavigationHandler: React.FC = () => {
         // Handle login: false → true
         if (!prevState.isAuthenticated && state.isAuthenticated) {
           if (traceEnabled) {
-            console.log('[NAV_ACTION] Login navigation triggered', {
+            console.log(`[NAV_PLAN-${traceId}] Login navigation planned:`, {
               from: location.pathname,
-              source: 'store'
+              reason: 'isAuthenticated: false → true',
+              source: 'store_subscription'
             });
           }
           
@@ -51,7 +60,7 @@ export const AuthNavigationHandler: React.FC = () => {
           if (returnTo) {
             sessionStorage.removeItem('auth-returnTo');
             if (traceEnabled) {
-              console.log('[NAV_ACTION] Navigating to returnTo:', returnTo);
+              console.log(`[NAV_DO-${traceId}] Navigating to returnTo: ${returnTo}`);
             }
             navigate(returnTo, { replace: true });
             return;
@@ -59,7 +68,7 @@ export const AuthNavigationHandler: React.FC = () => {
           
           // Default to dashboard
           if (traceEnabled) {
-            console.log('[NAV_ACTION] Navigating to dashboard');
+            console.log(`[NAV_DO-${traceId}] Navigating to dashboard: /dashboard`);
           }
           navigate('/dashboard', { replace: true });
         }
@@ -67,9 +76,10 @@ export const AuthNavigationHandler: React.FC = () => {
         // Handle logout: true → false
         if (prevState.isAuthenticated && !state.isAuthenticated) {
           if (traceEnabled) {
-            console.log('[NAV_ACTION] Logout navigation triggered', {
+            console.log(`[NAV_PLAN-${traceId}] Logout navigation planned:`, {
               from: location.pathname,
-              source: 'store'
+              reason: 'isAuthenticated: true → false',
+              source: 'store_subscription'
             });
           }
           
@@ -77,7 +87,10 @@ export const AuthNavigationHandler: React.FC = () => {
           if (location.pathname !== '/login' && location.pathname !== '/register' && location.pathname !== '/') {
             const returnTo = encodeURIComponent(location.pathname + location.search);
             if (traceEnabled) {
-              console.log('[NAV_ACTION] Preserving returnTo:', returnTo);
+              console.log(`[NAV_PLAN-${traceId}] Preserving returnTo: ${returnTo}`);
+            }
+            if (traceEnabled) {
+              console.log(`[NAV_DO-${traceId}] Navigating to login with returnTo: /login?returnTo=${returnTo}`);
             }
             navigate(`/login?returnTo=${returnTo}`, { replace: true });
             return;
@@ -85,13 +98,16 @@ export const AuthNavigationHandler: React.FC = () => {
           
           // Default to login
           if (traceEnabled) {
-            console.log('[NAV_ACTION] Navigating to login');
+            console.log(`[NAV_DO-${traceId}] Navigating to login: /login`);
           }
           navigate('/login', { replace: true });
         }
       },
       // Selector: only subscribe to auth-relevant changes
-      (state) => ({ isAuthenticated: state.isAuthenticated })
+      (state) => ({ 
+        isAuthenticated: state.isAuthenticated,
+        isInitialized: state.isInitialized 
+      })
     );
 
     return unsubscribe;

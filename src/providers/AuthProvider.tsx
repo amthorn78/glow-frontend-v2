@@ -53,14 +53,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Handle initialization - set to true on ANY resolution
   useEffect(() => {
     if (isSuccess || isError) {
-      const traceEnabled = import.meta.env.VITE_TRACE_AUTH === '1';
+      const traceEnabled = import.meta.env.VITE_TRACE_AUTH === '1' || true; // Force enable for debugging
       
       if (traceEnabled) {
-        console.log('[BOOTSTRAP] AuthProvider initialization:', {
+        console.log('[STORE] AuthProvider initialization:', {
           isSuccess,
           isError,
           hasAuthResult: !!authResult,
-          auth: authResult?.auth
+          auth: authResult?.auth,
+          prevInitialized: authStore.isInitialized,
+          nextInitialized: true
         });
       }
       
@@ -68,22 +70,65 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       authStore.setInitialized(true);
       
       if (traceEnabled) {
-        console.log('[BOOTSTRAP] isInitialized set to true');
+        console.log('[STORE] isInitialized: false → true');
       }
     }
   }, [isSuccess, isError, authStore, authResult]);
 
   // Handle authentication state from resolved result
   useEffect(() => {
+    const traceEnabled = import.meta.env.VITE_TRACE_AUTH === '1' || true; // Force enable for debugging
+    
     if (isSuccess && authResult) {
+      const prevAuth = authStore.isAuthenticated;
+      
       if (authResult.auth === 'authenticated' && authResult.user) {
+        if (traceEnabled) {
+          console.log('[STORE] Setting authenticated user:', {
+            prevAuth,
+            nextAuth: true,
+            userId: authResult.user.id,
+            reason: 'AuthProvider_success_authenticated'
+          });
+        }
+        
         authStore.setUser(authResult.user);
+        
+        if (traceEnabled && prevAuth !== true) {
+          console.log('[STORE] isAuthenticated: false → true');
+        }
       } else {
+        if (traceEnabled) {
+          console.log('[STORE] Setting unauthenticated state:', {
+            prevAuth,
+            nextAuth: false,
+            reason: 'AuthProvider_success_unauthenticated'
+          });
+        }
+        
         authStore.logout();
+        
+        if (traceEnabled && prevAuth !== false) {
+          console.log('[STORE] isAuthenticated: true → false');
+        }
       }
     } else if (isError) {
+      const prevAuth = authStore.isAuthenticated;
+      
+      if (traceEnabled) {
+        console.log('[STORE] Setting unauthenticated due to error:', {
+          prevAuth,
+          nextAuth: false,
+          reason: 'AuthProvider_error'
+        });
+      }
+      
       // Fallback: treat query errors as unauthenticated
       authStore.logout();
+      
+      if (traceEnabled && prevAuth !== false) {
+        console.log('[STORE] isAuthenticated: true → false (error)');
+      }
     }
   }, [isSuccess, isError, authResult, authStore]);
 
