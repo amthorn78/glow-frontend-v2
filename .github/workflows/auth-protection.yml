@@ -48,7 +48,7 @@ jobs:
           curl -L -sS -c "$JAR" -D /tmp/login_headers.txt -o /tmp/login.json \
             -H 'Content-Type: application/json' \
             -X POST "${BASE}/api/auth/login" \
-            --data '{"email":"admin@glow.app","password":"admin123"}'
+            --data '{"email":"admin@glowme.app","password":"admin123"}'
           
           LOGIN_CODE=$(awk 'toupper($1)=="HTTP/"{c=$2} END{print c}' /tmp/login_headers.txt)
           LOGIN_CTYPE=$(awk -F': ' 'tolower($1)=="content-type"{print tolower($2)}' /tmp/login_headers.txt | tail -1)
