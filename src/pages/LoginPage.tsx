@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useLoginMutation } from '../queries/auth/authQueries';
 import { PublicOnlyRoute } from '../components/PublicOnlyRoute';
-import apiClient from '../core/api';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -12,21 +11,34 @@ const LoginPage: React.FC = () => {
     email: '',
     password: ''
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const loginMutation = useLoginMutation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError(null);
     
     try {
       console.log('auth.login.submit', { email: formData.email, path: window.location.pathname });
       
-      const response = await loginMutation.mutateAsync(formData);
+      // FE-AUTH-ORCH-01: Direct API call instead of React Query mutation
+      const loginResponse = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(formData),
+      });
       
-      if (response.ok) {
-        console.log('auth.login.success', { hasUser: !!response.user });
+      const loginData = await loginResponse.json();
+      
+      if (loginResponse.ok && loginData.ok) {
+        console.log('auth.login.success', { hasUser: !!loginData.user });
         
-        // FE-AUTH-ORCH-01: Deterministic Login Handshake
         // Step 1: Store returnTo for navigation
         const searchParams = new URLSearchParams(location.search);
         const returnTo = searchParams.get('returnTo');
@@ -45,9 +57,15 @@ const LoginPage: React.FC = () => {
         
         // Step 2: Await real GET /api/auth/me (200) before navigation
         await performDeterministicHandshake();
+      } else {
+        console.error('auth.login.error', loginData);
+        setError(loginData.error || 'Login failed');
       }
     } catch (error) {
       console.error('auth.login.error', error);
+      setError(error instanceof Error ? error.message : 'Login failed');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -60,34 +78,47 @@ const LoginPage: React.FC = () => {
     try {
       // Direct /api/auth/me call with timeout
       const meResponse = await Promise.race([
-        apiClient.getCurrentUser(),
+        fetch('/api/auth/me', {
+          method: 'GET',
+          credentials: 'same-origin',
+          headers: {
+            'Accept': 'application/json',
+          },
+        }),
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Handshake timeout')), HANDSHAKE_TIMEOUT)
         )
-      ]) as any;
+      ]) as Response;
       
       const elapsed = Date.now() - startTime;
       
-      if (meResponse.data?.auth === 'authenticated' && meResponse.data?.user) {
-        console.log('auth.me.200', { 
-          userId: meResponse.data.user.id, 
-          isAdmin: meResponse.data.user.is_admin,
-          elapsed 
-        });
+      if (meResponse.ok) {
+        const meData = await meResponse.json();
         
-        // FE-ADMIN-BP-02: Admin Bypass Logic
-        const targetPath = determineNavigationTarget(meResponse.data.user);
-        
-        console.log('auth.navigate.begin', { 
-          target: targetPath, 
-          reason: 'handshake_success' 
-        });
-        
-        // Hard navigate as per spec
-        window.location.assign(targetPath);
-        
+        if (meData.auth === 'authenticated' && meData.user) {
+          console.log('auth.me.200', { 
+            userId: meData.user.id, 
+            isAdmin: meData.user.is_admin,
+            elapsed 
+          });
+          
+          // FE-ADMIN-BP-02: Admin Bypass Logic
+          const targetPath = determineNavigationTarget(meData.user);
+          
+          console.log('auth.navigate.begin', { 
+            target: targetPath, 
+            reason: 'handshake_success' 
+          });
+          
+          // Hard navigate as per spec
+          window.location.assign(targetPath);
+          
+        } else {
+          console.log('auth.me.401', { elapsed });
+          throw new Error('Authentication failed during handshake');
+        }
       } else {
-        console.log('auth.me.401', { elapsed });
+        console.log('auth.me.401', { elapsed, status: meResponse.status });
         throw new Error('Authentication failed during handshake');
       }
       
@@ -176,10 +207,10 @@ const LoginPage: React.FC = () => {
               </div>
 
               {/* Error Display */}
-              {loginMutation.error && (
+              {error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                   <p className="text-red-600 text-sm">
-                    {loginMutation.error.message || 'Login failed. Please try again.'}
+                    {error}
                   </p>
                 </div>
               )}
@@ -187,17 +218,10 @@ const LoginPage: React.FC = () => {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={loginMutation.isPending}
-                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-2 px-4 rounded-lg font-medium hover:from-pink-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-pink-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loginMutation.isPending ? (
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Signing In...
-                  </div>
-                ) : (
-                  'Sign In'
-                )}
+                {isLoading ? 'Signing In...' : 'Sign In'}
               </button>
             </form>
 
