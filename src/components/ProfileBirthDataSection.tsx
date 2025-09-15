@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useUserBirthData, useUpdateBirthDataMutation } from '../queries/auth/authQueries';
+import { useUserBirthData } from '../queries/auth/authQueries';
+import { updateBirthDataWithCsrf } from '../utils/csrfMutations';
 import BirthDataForm from './BirthDataForm';
 
 interface BirthDataFormData {
@@ -18,7 +19,6 @@ interface BirthDataFormData {
 const ProfileBirthDataSection: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const { data: birthData, isLoading } = useUserBirthData();
-  const updateBirthDataMutation = useUpdateBirthDataMutation();
 
   // Convert form data to API format
   const formatBirthData = (formData: BirthDataFormData) => {
@@ -48,11 +48,23 @@ const ProfileBirthDataSection: React.FC = () => {
     try {
       const birthDataFormatted = formatBirthData(formData);
       
-      // Save birth data and trigger HD recalculation
-      await updateBirthDataMutation.mutateAsync(birthDataFormatted);
+      console.log('save.birth.put.sent', { 
+        path: '/api/profile/birth-data', 
+        method: 'PUT', 
+        hasCookieHeader: true 
+      });
       
-      // Exit edit mode
-      setIsEditing(false);
+      // FE-CSRF-PIPE-02: Use centralized CSRF wrapper
+      const response = await updateBirthDataWithCsrf(birthDataFormatted);
+      
+      if (response.ok) {
+        console.log('save.birth.put.200', { success: true });
+        // Exit edit mode
+        setIsEditing(false);
+      } else {
+        console.error('save.birth.put.error', response);
+        throw new Error(response.error || 'Failed to save birth data');
+      }
     } catch (error) {
       console.error('Failed to update birth data:', error);
       throw error; // Let the form handle the error display

@@ -8,12 +8,12 @@ import {
   useRegisterMutation,
   useLogoutMutation,
   useCurrentUser,
-  useUpdateProfileMutation,
   useChangePasswordMutation,
   useForgotPasswordMutation,
   useResetPasswordMutation,
   useDeleteAccountMutation,
 } from '../queries/auth/authQueries';
+import { updateBasicInfoWithCsrf } from '../utils/csrfMutations';
 import type { LoginCredentials, RegisterData, User } from '../core/types';
 
 // ============================================================================
@@ -55,7 +55,6 @@ const useAuth = () => {
   const loginMutation = useLoginMutation();
   const registerMutation = useRegisterMutation();
   const logoutMutation = useLogoutMutation();
-  const updateProfileMutation = useUpdateProfileMutation();
   const changePasswordMutation = useChangePasswordMutation();
   const forgotPasswordMutation = useForgotPasswordMutation();
   const resetPasswordMutation = useResetPasswordMutation();
@@ -172,10 +171,21 @@ const useAuth = () => {
       authStore.setLoading(true);
       authStore.setError(null);
       
-      const response = await updateProfileMutation.mutateAsync(updates);
+      console.log('save.profile.put.sent', { 
+        path: '/api/profile/basic', 
+        method: 'PUT', 
+        hasCookieHeader: true 
+      });
       
-      if (response.user) {
-        authStore.updateUser(response.user);
+      // FE-CSRF-PIPE-02: Use centralized CSRF wrapper
+      const response = await updateBasicInfoWithCsrf(updates);
+      
+      if (response.ok && response.data?.user) {
+        console.log('save.profile.put.200', { success: true });
+        authStore.updateUser(response.data.user);
+      } else {
+        console.error('save.profile.put.error', response);
+        throw new Error(response.error || 'Profile update failed');
       }
       
       return response;
@@ -185,7 +195,7 @@ const useAuth = () => {
     } finally {
       authStore.setLoading(false);
     }
-  }, [updateProfileMutation, authStore]);
+  }, [authStore]);
 
   /**
    * Change password

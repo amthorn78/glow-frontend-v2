@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
-import { useUpdateBirthDataMutation } from '../queries/auth/authQueries';
+import { updateBirthDataWithCsrf } from '../utils/csrfMutations';
 import EnhancedBirthDataForm from '../components/EnhancedBirthDataForm';
 
 interface EnhancedBirthDataFormData {
@@ -17,7 +17,6 @@ interface EnhancedBirthDataFormData {
 const EnhancedBirthDataPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const updateBirthDataMutation = useUpdateBirthDataMutation();
 
   // Convert enhanced form data to API format
   const formatBirthData = (formData: EnhancedBirthDataFormData) => {
@@ -40,16 +39,26 @@ const EnhancedBirthDataPage: React.FC = () => {
     try {
       const birthData = formatBirthData(formData);
       
-      console.log('Submitting enhanced birth data:', birthData);
+      console.log('save.birth.put.sent', { 
+        path: '/api/profile/birth-data', 
+        method: 'PUT', 
+        hasCookieHeader: true 
+      });
       
-      // Save birth data and trigger HD calculation
-      await updateBirthDataMutation.mutateAsync(birthData);
+      // FE-CSRF-PIPE-02: Use centralized CSRF wrapper
+      const response = await updateBirthDataWithCsrf(birthData);
       
-      // Navigate to next step in registration (Magic 10 setup)
-      navigate('/magic10-setup');
+      if (response.ok) {
+        console.log('save.birth.put.200', { success: true });
+        // Navigate to next step in registration (Magic 10 setup)
+        navigate('/magic10-setup');
+      } else {
+        console.error('save.birth.put.error', response);
+        throw new Error(response.error || 'Failed to save birth data');
+      }
     } catch (error) {
       console.error('Failed to save birth data:', error);
-      throw error; // Let the form handle the error display
+      throw error;
     }
   };
 
