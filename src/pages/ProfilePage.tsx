@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useMagic10Store } from '../stores/magic10Store';
-import { useUserBirthData } from '../queries/auth/authQueries';
+import { useCurrentUser } from '../queries/auth/authQueries';
 import Magic10SimpleDisplay from '../components/Magic10SimpleDisplay';
 import BirthDataFormCanonical from '../components/BirthDataFormCanonical';
 import apiClient from '../core/api';
@@ -14,7 +14,10 @@ const ProfilePage: React.FC = () => {
   const queryClient = useQueryClient();
   const { user, isAuthenticated } = useAuthStore();
   const { priorities } = useMagic10Store();
-  const { data: birthData } = useUserBirthData(user?.id?.toString() || '', !!user?.id);
+  const { data: authResult } = useCurrentUser();
+  
+  // F1-A3: Access birth_data from /api/auth/me response
+  const birthData = authResult?.user?.birth_data;
   
   const [isEditing, setIsEditing] = useState(false);
   const [editingSection, setEditingSection] = useState<string | null>(null);
@@ -339,15 +342,15 @@ const ProfilePage: React.FC = () => {
                 <>
                   <div>
                     <span className="text-sm text-gray-500">Birth Date</span>
-                    <p className="font-medium">{birthData.birth_date}</p>
+                    <p className="font-medium">{birthData.date}</p>
                   </div>
                   <div>
                     <span className="text-sm text-gray-500">Birth Time</span>
-                    <p className="font-medium">{birthData.birth_time || 'Not set'}</p>
+                    <p className="font-medium">{birthData.time || 'Not set'}</p>
                   </div>
                   <div>
                     <span className="text-sm text-gray-500">Birth Location</span>
-                    <p className="font-medium">{birthData.birth_location || 'Not set'}</p>
+                    <p className="font-medium">{birthData.location || 'Not set'}</p>
                   </div>
                   <div className="bg-purple-50 rounded-lg p-3 mt-4">
                     <p className="text-sm text-purple-700">
