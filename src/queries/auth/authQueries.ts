@@ -559,7 +559,27 @@ export const useUpdateProfileMutation = () => {
 
   return useMutation({
     mutationFn: async (updates: Partial<User>) => {
-      const response = await apiClient.updateProfile(updates);
+      console.log('save.profile.put.sent', { 
+        path: '/api/profile/basic',
+        method: 'PUT',
+        hasCookieHeader: document.cookie.includes('glow_session')
+      });
+      
+      const { updateBasicInfoWithCsrf } = await import('../../utils/csrfMutations');
+      const response = await updateBasicInfoWithCsrf(updates);
+      
+      if (!response.ok) {
+        if (response.code === 'CSRF_INVALID' || response.code === 'CSRF_MISSING') {
+          console.log('save.profile.put.403', { reason: response.code });
+          throw new Error('CSRF validation failed. Please try again.');
+        } else if (response.error?.includes('Authentication required')) {
+          console.log('save.profile.put.401', { reason: 'auth_required' });
+          throw new Error('Authentication required. Please log in again.');
+        }
+        throw new Error(response.error || 'Failed to update profile');
+      }
+      
+      console.log('save.profile.put.200', { success: true });
       return response.data;
     },
 
@@ -738,7 +758,27 @@ export const useUpdateBirthDataMutation = () => {
 
   return useMutation({
     mutationFn: async (birthData: any) => {
-      const response = await apiClient.updateBirthData(birthData);
+      console.log('save.birth.put.sent', { 
+        path: '/api/profile/birth-data',
+        method: 'PUT',
+        hasCookieHeader: document.cookie.includes('glow_session')
+      });
+      
+      const { updateBirthDataWithCsrf } = await import('../../utils/csrfMutations');
+      const response = await updateBirthDataWithCsrf(birthData);
+      
+      if (!response.ok) {
+        if (response.code === 'CSRF_INVALID' || response.code === 'CSRF_MISSING') {
+          console.log('save.birth.put.403', { reason: response.code });
+          throw new Error('CSRF validation failed. Please try again.');
+        } else if (response.error?.includes('Authentication required')) {
+          console.log('save.birth.put.401', { reason: 'auth_required' });
+          throw new Error('Authentication required. Please log in again.');
+        }
+        throw new Error(response.error || 'Failed to update birth data');
+      }
+      
+      console.log('save.birth.put.200', { success: true });
       return response.data;
     },
 

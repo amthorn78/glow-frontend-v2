@@ -1,8 +1,9 @@
-// Login Page - Auth v2 Cookie Model
+// Login Page - Auth v2 Cookie Model with Deterministic Handshake
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useLoginMutation } from '../queries/auth/authQueries';
 import { PublicOnlyRoute } from '../components/PublicOnlyRoute';
+import apiClient from '../core/api';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -18,10 +19,15 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     
     try {
+      console.log('auth.login.submit', { email: formData.email, path: window.location.pathname });
+      
       const response = await loginMutation.mutateAsync(formData);
       
       if (response.ok) {
-        // Store returnTo for auth store subscription to use
+        console.log('auth.login.success', { hasUser: !!response.user });
+        
+        // FE-AUTH-ORCH-01: Deterministic Login Handshake
+        // Step 1: Store returnTo for navigation
         const searchParams = new URLSearchParams(location.search);
         const returnTo = searchParams.get('returnTo');
         
@@ -37,12 +43,80 @@ const LoginPage: React.FC = () => {
           }
         }
         
-        // Navigation will be handled by auth store subscription
+        // Step 2: Await real GET /api/auth/me (200) before navigation
+        await performDeterministicHandshake();
       }
     } catch (error) {
-      // Error is handled by the mutation
-      console.error('Login error:', error);
+      console.error('auth.login.error', error);
     }
+  };
+
+  const performDeterministicHandshake = async () => {
+    const HANDSHAKE_TIMEOUT = 2000; // 2 seconds as per spec
+    const startTime = Date.now();
+    
+    console.log('auth.me.probe.start', { timeout: HANDSHAKE_TIMEOUT });
+    
+    try {
+      // Direct /api/auth/me call with timeout
+      const meResponse = await Promise.race([
+        apiClient.getCurrentUser(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Handshake timeout')), HANDSHAKE_TIMEOUT)
+        )
+      ]) as any;
+      
+      const elapsed = Date.now() - startTime;
+      
+      if (meResponse.data?.auth === 'authenticated' && meResponse.data?.user) {
+        console.log('auth.me.200', { 
+          userId: meResponse.data.user.id, 
+          isAdmin: meResponse.data.user.is_admin,
+          elapsed 
+        });
+        
+        // FE-ADMIN-BP-02: Admin Bypass Logic
+        const targetPath = determineNavigationTarget(meResponse.data.user);
+        
+        console.log('auth.navigate.begin', { 
+          target: targetPath, 
+          reason: 'handshake_success' 
+        });
+        
+        // Hard navigate as per spec
+        window.location.assign(targetPath);
+        
+      } else {
+        console.log('auth.me.401', { elapsed });
+        throw new Error('Authentication failed during handshake');
+      }
+      
+    } catch (error) {
+      const elapsed = Date.now() - startTime;
+      console.log('auth.me.timeout', { elapsed, error: error.message });
+      
+      // Break-glass: hard reload once
+      console.log('auth.reload.breakglass', { reason: 'handshake_failed' });
+      window.location.reload();
+    }
+  };
+
+  const determineNavigationTarget = (user: any): string => {
+    // FE-ADMIN-BP-02: Admin always goes to dashboard
+    if (user.is_admin) {
+      return '/dashboard';
+    }
+    
+    // Check for stored returnTo
+    const returnTo = sessionStorage.getItem('auth-returnTo');
+    if (returnTo) {
+      sessionStorage.removeItem('auth-returnTo');
+      return returnTo;
+    }
+    
+    // Non-admin without birth data goes to birth-data page
+    // This will be handled by ProtectedRoute guard
+    return '/dashboard';
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
