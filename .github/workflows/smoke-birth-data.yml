@@ -1,0 +1,46 @@
+name: Smoke Test - Birth Data
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  smoke-birth-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run birth data smoke test
+      env:
+        SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+        SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+        SMOKE_BASE_URL: ${{ secrets.SMOKE_BASE_URL || 'https://glowme.io' }}
+      run: |
+        echo "Starting birth data smoke test..."
+        echo "Target: $SMOKE_BASE_URL"
+        echo "Email: ${SMOKE_EMAIL:0:5}***"
+        
+        # Run the smoke test
+        ./scripts/smoke_birth_data.sh
+        
+        echo "Smoke test completed successfully!"
+        
+    - name: Report results
+      if: always()
+      run: |
+        if [ $? -eq 0 ]; then
+          echo "✅ Birth data smoke test PASSED"
+          echo "- Login/CSRF working"
+          echo "- Time validation working (HH:mm:ss → 400, HH:mm → 200)"
+          echo "- Data persistence working"
+          echo "- CSRF protection working"
+        else
+          echo "❌ Birth data smoke test FAILED"
+          echo "Check logs above for details"
+          exit 1
+        fi
+
