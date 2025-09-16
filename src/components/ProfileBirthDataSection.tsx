@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useUserBirthData } from '../queries/auth/authQueries';
 import { updateBirthDataWithCsrf } from '../utils/csrfMutations';
+import { formatTimeToHHMM } from '../utils/time';
 import BirthDataForm from './BirthDataForm';
 
 interface BirthDataFormData {
@@ -45,16 +46,12 @@ const ProfileBirthDataSection: React.FC = () => {
     const birthDate = `${formData.day}/${monthName}/${formData.year}`;
     
     // Convert to HH:MM format
-    const birthTime = `${formData.hours}:${formData.minutes}`;
+    const birthTime = formatTimeToHHMM(`${formData.hours}:${formData.minutes}`);
     
     return {
       birth_date: birthDate,
       birth_time: birthTime,
-      birth_location: formData.location,
-      birth_coordinates: formData.coordinates ? {
-        latitude: formData.coordinates.lat,
-        longitude: formData.coordinates.lng
-      } : undefined
+      birth_location: formData.location
     };
   };
 
