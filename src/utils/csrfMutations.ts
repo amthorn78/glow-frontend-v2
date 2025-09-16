@@ -5,7 +5,7 @@ import { emitAuthBreadcrumb } from './authTelemetry';
 
 // Runtime debug flag helper (default OFF)
 const debugKeysOnly = (): boolean => {
-  return Boolean(process.env.NEXT_PUBLIC_GLOW_DEBUG_KEYS_ONLY === 'true');
+  return Boolean(process.env.NEXT_PUBLIC_GLOW_DEBUG_KEYS_ONLY === '1');
 };
 
 interface MutationResponse<T = any> {
@@ -121,7 +121,7 @@ export async function mutateWithCsrf<T = any>(
   // Prepare request options
   const requestOptions: RequestInit = {
     method,
-    credentials: 'same-origin',
+    credentials: 'include',
     headers,
   };
 
@@ -139,7 +139,7 @@ export async function mutateWithCsrf<T = any>(
     if (response.status === 403 && isCsrfError(data)) {
       // Runtime-gated debug breadcrumb (keys-only)
       if (debugKeysOnly()) {
-        console.info('bd_csrf_auto_recover', 'start');
+        console.info('bd_csrf_auto_recover start');
       }
 
       emitAuthBreadcrumb('auth.handshake.me_invalidate', { 
@@ -162,7 +162,7 @@ export async function mutateWithCsrf<T = any>(
         if (response.ok) {
           // Runtime-gated debug breadcrumb (keys-only)
           if (debugKeysOnly()) {
-            console.info('bd_csrf_auto_recover', 'success');
+            console.info('bd_csrf_auto_recover success');
           }
 
           emitAuthBreadcrumb('auth.login.success', { 
@@ -172,7 +172,7 @@ export async function mutateWithCsrf<T = any>(
         } else {
           // Runtime-gated debug breadcrumb (keys-only)
           if (debugKeysOnly()) {
-            console.info('bd_csrf_auto_recover', `fail code=${data.code || 'unknown'}`);
+            console.info(`bd_csrf_auto_recover fail code=${data.code || 'unknown'}`);
           }
 
           emitAuthBreadcrumb('auth.login.break_glass.reload', { 
@@ -184,7 +184,7 @@ export async function mutateWithCsrf<T = any>(
       } else {
         // Runtime-gated debug breadcrumb (keys-only)
         if (debugKeysOnly()) {
-          console.info('bd_csrf_auto_recover', 'fail code=csrf_refresh_failed');
+          console.info('bd_csrf_auto_recover fail code=csrf_refresh_failed');
         }
 
         emitAuthBreadcrumb('auth.login.break_glass.reload', { 
