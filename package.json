@@ -11,6 +11,7 @@
     "auth:guards": "node scripts/auth-guards.cjs",
     "auth:smoke": "node scripts/auth-smoke.cjs",
     "auth:check": "npm run auth:guards && npm run auth:smoke",
+    "smoke:birth-data": "./scripts/smoke_birth_data.sh",
     "prebuild": "npm run auth:guards"
   },
   "dependencies": {
