@@ -45,7 +45,7 @@ async function refreshCsrfToken(): Promise<string | null> {
     
     const response = await fetch('/api/auth/csrf', {
       method: 'GET',
-      credentials: 'same-origin',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -137,6 +137,11 @@ export async function mutateWithCsrf<T = any>(
 
     // Check for CSRF error on first attempt
     if (response.status === 403 && isCsrfError(data)) {
+      // Runtime-gated debug breadcrumb (keys-only)
+      if (debugKeysOnly()) {
+        console.info('bd_csrf_auto_recover', 'start');
+      }
+
       emitAuthBreadcrumb('auth.handshake.me_invalidate', { 
         route: path,
         error_code: data.code
@@ -155,11 +160,21 @@ export async function mutateWithCsrf<T = any>(
         data = await response.json();
 
         if (response.ok) {
+          // Runtime-gated debug breadcrumb (keys-only)
+          if (debugKeysOnly()) {
+            console.info('bd_csrf_auto_recover', 'success');
+          }
+
           emitAuthBreadcrumb('auth.login.success', { 
             route: path,
             latency_ms: Date.now() - startTime
           });
         } else {
+          // Runtime-gated debug breadcrumb (keys-only)
+          if (debugKeysOnly()) {
+            console.info('bd_csrf_auto_recover', `fail code=${data.code || 'unknown'}`);
+          }
+
           emitAuthBreadcrumb('auth.login.break_glass.reload', { 
             route: path,
             http_status: response.status,
@@ -167,6 +182,11 @@ export async function mutateWithCsrf<T = any>(
           });
         }
       } else {
+        // Runtime-gated debug breadcrumb (keys-only)
+        if (debugKeysOnly()) {
+          console.info('bd_csrf_auto_recover', 'fail code=csrf_refresh_failed');
+        }
+
         emitAuthBreadcrumb('auth.login.break_glass.reload', { 
           route: path,
           error_code: 'csrf_refresh_failed'
