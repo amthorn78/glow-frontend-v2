@@ -18,6 +18,8 @@ interface BirthDataFormData {
 
 const ProfileBirthDataSection: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [generalError, setGeneralError] = useState<string>('');
   const { data: birthData, isLoading } = useUserBirthData();
 
   // Convert form data to API format
@@ -48,30 +50,46 @@ const ProfileBirthDataSection: React.FC = () => {
     try {
       const birthDataFormatted = formatBirthData(formData);
       
-      console.log('save.birth.put.sent', { 
-        path: '/api/profile/birth-data', 
-        method: 'PUT', 
-        hasCookieHeader: true 
-      });
+      // Clear previous errors
+      setFieldErrors({});
+      setGeneralError('');
+      
+      // Keys-only diagnostic before request
+      console.info('bd_req_keys', { route: 'PUT /api/profile/birth-data', keys: Object.keys(birthDataFormatted) });
       
       // FE-CSRF-PIPE-02: Use centralized CSRF wrapper
       const response = await updateBirthDataWithCsrf(birthDataFormatted);
       
       if (response.ok) {
-        console.log('save.birth.put.200', { success: true });
-        // Exit edit mode
+        // Clear errors and exit edit mode
+        setFieldErrors({});
+        setGeneralError('');
         setIsEditing(false);
       } else {
-        console.error('save.birth.put.error', response);
-        throw new Error(response.error || 'Failed to save birth data');
+        // Handle typed validation errors
+        if (response.error === 'validation_error' && response.details) {
+          // Keys-only diagnostic for error response
+          console.info('bd_resp_err_keys', { route: 'PUT /api/profile/birth-data', keys: Object.keys(response.details) });
+          
+          // Set field-specific errors
+          const errors: Record<string, string> = {};
+          if (response.details.birth_time) errors.birth_time = response.details.birth_time[0];
+          if (response.details.birth_date) errors.birth_date = response.details.birth_date[0];
+          setFieldErrors(errors);
+        } else {
+          // Generic error for non-validation errors
+          setGeneralError(response.error || 'Unable to save. Please try again.');
+        }
       }
     } catch (error) {
       console.error('Failed to update birth data:', error);
-      throw error; // Let the form handle the error display
+      setGeneralError('Unable to save. Please try again.');
     }
   };
 
   const handleCancel = () => {
+    setFieldErrors({});
+    setGeneralError('');
     setIsEditing(false);
   };
 
@@ -115,18 +133,32 @@ const ProfileBirthDataSection: React.FC = () => {
 
   if (isEditing) {
     return (
-      <BirthDataForm
-        initialData={{
-          birthDate: birthData?.birth_date,
-          birthTime: birthData?.birth_time,
-          birthLocation: birthData?.birth_location
-        }}
-        onSubmit={handleSubmit}
-        onCancel={handleCancel}
-        submitButtonText="Update Birth Data"
-        showCancelButton={true}
-        isRequired={false}
-      />
+      <div className="bg-white rounded-xl p-6 shadow-lg mb-6">
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">Birth Information</h3>
+          
+          {/* General Error Display */}
+          {generalError && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-3">
+              <p className="text-red-800 text-sm">{generalError}</p>
+            </div>
+          )}
+          
+          <BirthDataForm
+            initialData={{
+              birthDate: birthData?.birth_date,
+              birthTime: birthData?.birth_time,
+              birthLocation: birthData?.birth_location
+            }}
+            onSubmit={handleSubmit}
+            onCancel={handleCancel}
+            submitButtonText="Update Birth Data"
+            showCancelButton={true}
+            isRequired={false}
+            fieldErrors={fieldErrors}
+          />
+        </div>
+      </div>
     );
   }
 

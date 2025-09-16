@@ -8,6 +8,7 @@ interface MutationResponse<T = any> {
   data?: T;
   error?: string;
   code?: string;
+  details?: Record<string, string[]>;
 }
 
 interface CSRFError {
@@ -180,6 +181,7 @@ export async function mutateWithCsrf<T = any>(
       data: response.ok ? data : undefined,
       error: response.ok ? undefined : (data.error || `HTTP ${response.status}`),
       code: data.code,
+      details: data.details,
     };
 
   } catch (error) {

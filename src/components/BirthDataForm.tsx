@@ -12,6 +12,7 @@ interface BirthDataFormProps {
   submitButtonText?: string;
   showCancelButton?: boolean;
   isRequired?: boolean;
+  fieldErrors?: Record<string, string>;
 }
 
 interface BirthDataFormData {
@@ -33,7 +34,8 @@ const BirthDataForm: React.FC<BirthDataFormProps> = ({
   onCancel,
   submitButtonText = "Save Birth Data",
   showCancelButton = false,
-  isRequired = true
+  isRequired = true,
+  fieldErrors = {}
 }) => {
   const { user } = useAuthStore();
   const [formData, setFormData] = useState<BirthDataFormData>({
@@ -350,6 +352,10 @@ const BirthDataForm: React.FC<BirthDataFormProps> = ({
               {errors.minutes && <p className="text-red-500 text-xs mt-1">{errors.minutes}</p>}
             </div>
           </div>
+          {/* Field error from backend validation */}
+          {fieldErrors.birth_time && (
+            <p className="text-red-500 text-sm mt-2">{fieldErrors.birth_time}</p>
+          )}
         </div>
 
         {/* Birth Location */}
