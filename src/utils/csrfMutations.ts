@@ -8,6 +8,24 @@ const debugKeysOnly = (): boolean => {
   return Boolean(process.env.NEXT_PUBLIC_GLOW_DEBUG_KEYS_ONLY === '1');
 };
 
+// CSRF telemetry flag helper (default OFF)
+const csrfTelemetryEnabled = (): boolean => {
+  return Boolean(process.env.NEXT_PUBLIC_GLOW_TELEMETRY_CSRF === '1');
+};
+
+// Deterministic 10% sampling based on hash-mod-10
+const shouldSampleCsrfTelemetry = (): boolean => {
+  if (!csrfTelemetryEnabled()) return false;
+  
+  // Simple hash of current timestamp for deterministic sampling
+  const hash = Date.now().toString().split('').reduce((a, b) => {
+    a = ((a << 5) - a) + b.charCodeAt(0);
+    return a & a;
+  }, 0);
+  
+  return Math.abs(hash) % 10 === 0; // 10% sampling
+};
+
 interface MutationResponse<T = any> {
   ok: boolean;
   data?: T;
@@ -40,6 +58,8 @@ function getCsrfTokenFromCookie(): string | null {
  * Fetch fresh CSRF token from backend
  */
 async function refreshCsrfToken(): Promise<string | null> {
+  const rotateStartTime = Date.now();
+  
   try {
     emitAuthBreadcrumb('auth.bootstrap.me.start', { route: '/api/auth/csrf' });
     
@@ -51,11 +71,30 @@ async function refreshCsrfToken(): Promise<string | null> {
       },
     });
 
+    const rotateDuration = Math.round(Date.now() - rotateStartTime);
+
     if (!response.ok) {
+      // CSRF telemetry: rotate failure
+      if (shouldSampleCsrfTelemetry()) {
+        const statusCategory = response.status >= 500 ? '5xx' : '401';
+        console.info(`bd_csrf_rotate_${statusCategory}`, { 
+          status: response.status, 
+          dur_ms: rotateDuration 
+        });
+      }
+      
       emitAuthBreadcrumb('auth.bootstrap.me.401', { 
         http_status: response.status
       });
       return null;
+    }
+
+    // CSRF telemetry: rotate success
+    if (shouldSampleCsrfTelemetry()) {
+      console.info('bd_csrf_rotate_200', { 
+        status: 200, 
+        dur_ms: rotateDuration 
+      });
     }
 
     const data = await response.json();
@@ -65,6 +104,16 @@ async function refreshCsrfToken(): Promise<string | null> {
     
     return data.csrf_token || null;
   } catch (error) {
+    const rotateDuration = Math.round(Date.now() - rotateStartTime);
+    
+    // CSRF telemetry: rotate error
+    if (shouldSampleCsrfTelemetry()) {
+      console.info('bd_csrf_rotate_5xx', { 
+        status: 0, 
+        dur_ms: rotateDuration 
+      });
+    }
+    
     emitAuthBreadcrumb('auth.bootstrap.me.401', { 
       error_code: error instanceof Error ? error.message : 'Unknown error'
     });
@@ -137,6 +186,11 @@ export async function mutateWithCsrf<T = any>(
 
     // Check for CSRF error on first attempt
     if (response.status === 403 && isCsrfError(data)) {
+      // CSRF telemetry: auto-recovery start
+      if (shouldSampleCsrfTelemetry()) {
+        console.info('bd_csrf_auto_recover_start', { retry: 1 });
+      }
+      
       // Runtime-gated debug breadcrumb (keys-only)
       if (debugKeysOnly()) {
         console.info('bd_csrf_auto_recover start');
@@ -160,6 +214,11 @@ export async function mutateWithCsrf<T = any>(
         data = await response.json();
 
         if (response.ok) {
+          // CSRF telemetry: auto-recovery success
+          if (shouldSampleCsrfTelemetry()) {
+            console.info('bd_csrf_auto_recover_success', { retry: 1 });
+          }
+          
           // Runtime-gated debug breadcrumb (keys-only)
           if (debugKeysOnly()) {
             console.info('bd_csrf_auto_recover success');
@@ -170,6 +229,11 @@ export async function mutateWithCsrf<T = any>(
             latency_ms: Date.now() - startTime
           });
         } else {
+          // CSRF telemetry: auto-recovery fail
+          if (shouldSampleCsrfTelemetry()) {
+            console.info('bd_csrf_auto_recover_fail', { retry: 1 });
+          }
+          
           // Runtime-gated debug breadcrumb (keys-only)
           if (debugKeysOnly()) {
             console.info(`bd_csrf_auto_recover fail code=${data.code || 'unknown'}`);
@@ -182,6 +246,11 @@ export async function mutateWithCsrf<T = any>(
           });
         }
       } else {
+        // CSRF telemetry: auto-recovery fail (token refresh failed)
+        if (shouldSampleCsrfTelemetry()) {
+          console.info('bd_csrf_auto_recover_fail', { retry: 0 });
+        }
+        
         // Runtime-gated debug breadcrumb (keys-only)
         if (debugKeysOnly()) {
           console.info('bd_csrf_auto_recover fail code=csrf_refresh_failed');
