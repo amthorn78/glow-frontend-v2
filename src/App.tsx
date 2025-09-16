@@ -14,8 +14,6 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import BirthDataPage from './pages/BirthDataPage';
-import BirthDataComparisonPage from './pages/BirthDataComparisonPage';
-import EnhancedBirthDataPage from './pages/EnhancedBirthDataPage';
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
@@ -97,6 +95,15 @@ const AppRoutes: React.FC = () => {
         />
         
         <Route 
+          path="/dashboard" 
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
           path="/birth-data" 
           element={
             <ProtectedRoute>
@@ -106,42 +113,25 @@ const AppRoutes: React.FC = () => {
         />
         
         <Route 
-          path="/birth-data-comparison" 
+          path="/profile" 
           element={
             <ProtectedRoute>
-              <BirthDataComparisonPage />
+              <ProfilePage />
             </ProtectedRoute>
           } 
+        />
+        
+        <Route 
+          path="/birth-data-comparison" 
+          element={<Navigate to="/birth-data" replace />} 
         />
         
         <Route 
           path="/enhanced-birth-data" 
-          element={
-            <ProtectedRoute>
-              <EnhancedBirthDataPage />
-            </ProtectedRoute>
-          } 
+          element={<Navigate to="/birth-data" replace />} 
         />
         
-        <Route 
-          path="/magic10-setup" 
-          element={
-            <ProtectedRoute>
-              <Magic10SetupPage />
-            </ProtectedRoute>
-          } 
-        />
-        
-        <Route 
-          path="/resonance-ten-setup" 
-          element={
-            <ProtectedRoute>
-              <ResonanceTenSetupPage />
-            </ProtectedRoute>
-          } 
-        />
-        
-        <Route 
+        <Route
           path="/discovery" 
           element={
             <ProtectedRoute>
