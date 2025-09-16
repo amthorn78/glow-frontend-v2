@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '../queries/auth/authQueries';
 import { updateBirthDataWithCsrf } from '../utils/csrfMutations';
 import { emitAuthBreadcrumb } from '../utils/authTelemetry';
+import { formatTimeToHHMM } from '../utils/time';
 
 interface BirthDataFormCanonicalProps {
   onSuccess?: () => void;
@@ -226,15 +227,6 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  // Normalize time to HH:MM:SS format for server (from HH:MM input)
-  const normalizeTime = (time: string): string => {
-    // Input is HH:MM, server expects HH:MM:SS
-    if (time && time.includes(':') && time.split(':').length === 2) {
-      return `${time}:00`;
-    }
-    return time;
-  };
-
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -252,14 +244,11 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
         has_location: !!formData.location
       });
 
-      // Prepare data for API (normalize time to HH:MM:SS, include coordinates)
+      // Prepare data for API (strict HH:mm format, snake_case keys)
       const birthDataPayload = {
-        date: formData.date,
-        time: normalizeTime(formData.time),
-        timezone: formData.timezone,
-        location: formData.location.trim(),
-        latitude: formData.latitude,
-        longitude: formData.longitude
+        birth_date: formData.date,
+        birth_time: formatTimeToHHMM(formData.time),
+        birth_location: formData.location.trim()
       };
 
       emitAuthBreadcrumb('api.birth.put.request', {
