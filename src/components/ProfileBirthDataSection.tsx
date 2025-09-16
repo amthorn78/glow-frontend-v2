@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUserBirthData } from '../queries/auth/authQueries';
 import { updateBirthDataWithCsrf } from '../utils/csrfMutations';
 import BirthDataForm from './BirthDataForm';
@@ -21,6 +21,18 @@ const ProfileBirthDataSection: React.FC = () => {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [generalError, setGeneralError] = useState<string>('');
   const { data: birthData, isLoading } = useUserBirthData();
+
+  // Runtime debug flag helper
+  const debugKeysOnly = (): boolean => {
+    return Boolean(process.env.NEXT_PUBLIC_GLOW_DEBUG_KEYS_ONLY === 'true');
+  };
+
+  // Component mount sentinel (runtime-gated)
+  useEffect(() => {
+    if (debugKeysOnly()) {
+      console.info('bd_component_mount', { file: 'ProfileBirthDataSection.tsx', route: 'PUT /api/profile/birth-data' });
+    }
+  }, []);
 
   // Convert form data to API format
   const formatBirthData = (formData: BirthDataFormData) => {
@@ -54,32 +66,30 @@ const ProfileBirthDataSection: React.FC = () => {
       setFieldErrors({});
       setGeneralError('');
       
-      // Keys-only diagnostic before request
-      console.info('bd_req_keys', { route: 'PUT /api/profile/birth-data', keys: Object.keys(birthDataFormatted) });
-      
       // FE-CSRF-PIPE-02: Use centralized CSRF wrapper
       const response = await updateBirthDataWithCsrf(birthDataFormatted);
       
-      if (response.ok) {
-        // Clear errors and exit edit mode
+      if (!response.ok && response.status === 400 && response.details) {
+        // Handle typed validation errors - wire to form display
+        if (debugKeysOnly()) {
+          console.info('bd_resp_err_keys', { route: 'PUT /api/profile/birth-data', keys: Object.keys(response.details) });
+        }
+        
+        // Set field-specific errors for inline display
+        setFieldErrors(response.details);
+        setGeneralError(''); // Clear general error when we have field-specific errors
+        
+        // No refetch on 4xx - keep form populated for correction
+        return;
+      } else if (response.ok) {
+        // Success - clear errors and exit edit mode
         setFieldErrors({});
         setGeneralError('');
         setIsEditing(false);
       } else {
-        // Handle typed validation errors
-        if (response.error === 'validation_error' && response.details) {
-          // Keys-only diagnostic for error response
-          console.info('bd_resp_err_keys', { route: 'PUT /api/profile/birth-data', keys: Object.keys(response.details) });
-          
-          // Set field-specific errors
-          const errors: Record<string, string> = {};
-          if (response.details.birth_time) errors.birth_time = response.details.birth_time[0];
-          if (response.details.birth_date) errors.birth_date = response.details.birth_date[0];
-          setFieldErrors(errors);
-        } else {
-          // Generic error for non-validation errors
-          setGeneralError(response.error || 'Unable to save. Please try again.');
-        }
+        // Generic error fallback for non-400 errors
+        setGeneralError(response.error || 'Unable to save. Please try again.');
+        setFieldErrors({});
       }
     } catch (error) {
       console.error('Failed to update birth data:', error);

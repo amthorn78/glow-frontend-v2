@@ -3,6 +3,11 @@
 
 import { emitAuthBreadcrumb } from './authTelemetry';
 
+// Runtime debug flag helper (default OFF)
+const debugKeysOnly = (): boolean => {
+  return Boolean(process.env.NEXT_PUBLIC_GLOW_DEBUG_KEYS_ONLY === 'true');
+};
+
 interface MutationResponse<T = any> {
   ok: boolean;
   data?: T;
@@ -98,6 +103,11 @@ export async function mutateWithCsrf<T = any>(
     route: path
   });
 
+  // Runtime-gated request logging (keys-only)
+  if (debugKeysOnly()) {
+    console.info('bd_req_keys', { route: path, keys: Object.keys(body || {}) });
+  }
+
   // Prepare headers
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -172,6 +182,21 @@ export async function mutateWithCsrf<T = any>(
         route: path,
         http_status: response.status,
         error_code: data.error || 'Unknown error'
+      });
+    }
+
+    // Runtime-gated response metadata (keys-only)
+    if (debugKeysOnly()) {
+      // Check if time matches HH:mm format (boolean only, no values)
+      const timeValue = body?.time || '';
+      const matches_hhmm = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(String(timeValue));
+      
+      console.info('bd_resp_meta', { 
+        route: path, 
+        ok: response.ok, 
+        status: response.status, 
+        has_details: !!data.details,
+        matches_hhmm 
       });
     }
 
