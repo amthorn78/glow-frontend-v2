@@ -182,7 +182,27 @@ export async function mutateWithCsrf<T = any>(
   try {
     // First attempt
     let response = await fetch(path, requestOptions);
-    let data = await response.json();
+    
+    // HF-BIO-001C: Strict success gate - 4xx never counts as success
+    if (!response.ok && response.status !== 403) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
+    let data;
+    
+    // HF-BIO-001C: Safely parse JSON, handle plain text responses
+    try {
+      data = await response.json();
+    } catch (jsonError) {
+      // Handle plain text responses (e.g., proxy 400s)
+      const bodyText = await response.text();
+      data = {
+        code: 'HTTP_ERROR',
+        error: `HTTP ${response.status}`,
+        status: response.status,
+        bodyText: bodyText
+      };
+    }
 
     // Check for CSRF error on first attempt
     if (response.status === 403 && isCsrfError(data)) {
@@ -211,7 +231,19 @@ export async function mutateWithCsrf<T = any>(
 
         // Retry the original request
         response = await fetch(path, requestOptions);
-        data = await response.json();
+        
+        // HF-BIO-001C: Safely parse JSON on retry as well
+        try {
+          data = await response.json();
+        } catch (jsonError) {
+          const bodyText = await response.text();
+          data = {
+            code: 'HTTP_ERROR',
+            error: `HTTP ${response.status}`,
+            status: response.status,
+            bodyText: bodyText
+          };
+        }
 
         if (response.ok) {
           // CSRF telemetry: auto-recovery success
