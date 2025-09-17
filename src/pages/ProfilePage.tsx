@@ -6,7 +6,7 @@ import { useCurrentUser } from '../queries/auth/authQueries';
 import Magic10SimpleDisplay from '../components/Magic10SimpleDisplay';
 import BirthDataFormCanonical from '../components/BirthDataFormCanonical';
 import apiClient from '../core/api';
-import { updateBasicInfoWithCsrf } from '../utils/csrfMutations';
+import { getCsrfTokenFromCookie } from '../utils/csrfMutations';
 import { useQueryClient } from '@tanstack/react-query';
 import { safeFormatBirthDate, safeFormatBirthTime } from '../utils/dateTime';
 
@@ -38,16 +38,16 @@ const ProfilePage: React.FC = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  // Initialize form data with user info
+  // SW-G5: Initialize form data from authResult (fresh from API) to avoid optimistic masking
   useEffect(() => {
-    if (user) {
+    if (authResult?.user) {
       setFormData({
-        first_name: user.first_name || '',
-        last_name: user.last_name || '',
-        bio: user.bio || ''
+        first_name: authResult.user.first_name || '',
+        last_name: authResult.user.last_name || '',
+        bio: authResult.user.bio || ''
       });
     }
-  }, [user]);
+  }, [authResult]);
 
   // Calculate profile completion percentage
   const calculateCompletion = () => {
@@ -75,10 +75,19 @@ const ProfilePage: React.FC = () => {
         bio: formData.bio ?? ''
       };
 
-      // Save via centralized CSRF wrapper
-      const response = await updateBasicInfoWithCsrf(basicInfoPayload);
+      // SW-G5: Direct fetch to avoid body parsing, gate on response.ok only
+      const response = await fetch('/api/profile/basic-info', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': getCsrfTokenFromCookie() || ''
+        },
+        credentials: 'include',
+        body: JSON.stringify(basicInfoPayload)
+      });
       
       if (response.ok) {
+        // SW-G5: Success on any 2xx (204/200), no body parsing
         setMessage({ type: 'success', text: 'Profile updated successfully!' });
         setEditingSection(null);
         setFieldErrors({}); // Clear any previous field errors
@@ -87,20 +96,10 @@ const ProfilePage: React.FC = () => {
         await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
         await queryClient.refetchQueries({ queryKey: ['auth', 'me'] });
       } else {
-        // Handle typed validation errors
-        if (response.error === 'validation_error' && response.details) {
-          const errors: { [key: string]: string } = {};
-          Object.keys(response.details).forEach(field => {
-            if (response.details[field] && response.details[field][0]) {
-              errors[field] = response.details[field][0];
-            }
-          });
-          setFieldErrors(errors);
-        }
-        
+        // SW-G5: Error path - no cache invalidation, show error
         setMessage({ 
           type: 'error', 
-          text: response.error || 'Failed to update profile' 
+          text: `Failed to update profile (HTTP ${response.status})` 
         });
       }
     } catch (error) {
