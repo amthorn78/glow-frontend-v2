@@ -24,11 +24,11 @@ const ProfilePage: React.FC = () => {
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
-    email: '',
     bio: ''
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -43,7 +43,6 @@ const ProfilePage: React.FC = () => {
       setFormData({
         first_name: user.first_name || '',
         last_name: user.last_name || '',
-        email: user.email || '',
         bio: user.bio || ''
       });
     }
@@ -68,14 +67,11 @@ const ProfilePage: React.FC = () => {
     setMessage(null);
 
     try {
-      // Prepare basic info payload (exclude email - that's handled separately)
+      // Prepare basic info payload - only send fields the backend expects
       const basicInfoPayload = {
-        display_name: formData.display_name || null,
-        first_name: formData.first_name || null,
-        last_name: formData.last_name || null,
-        bio: formData.bio || null,
-        age: formData.age || null,
-        avatar_url: formData.avatar_url || null
+        first_name: formData.first_name?.trim() ?? '',
+        last_name: formData.last_name?.trim() ?? '',
+        bio: formData.bio ?? ''
       };
 
       // Save via centralized CSRF wrapper
@@ -84,11 +80,23 @@ const ProfilePage: React.FC = () => {
       if (response.ok) {
         setMessage({ type: 'success', text: 'Profile updated successfully!' });
         setEditingSection(null);
+        setFieldErrors({}); // Clear any previous field errors
         
         // Invalidate and refetch /api/auth/me (round-trip guarantee)
         await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
         await queryClient.refetchQueries({ queryKey: ['auth', 'me'] });
       } else {
+        // Handle typed validation errors
+        if (response.error === 'validation_error' && response.details) {
+          const errors: { [key: string]: string } = {};
+          Object.keys(response.details).forEach(field => {
+            if (response.details[field] && response.details[field][0]) {
+              errors[field] = response.details[field][0];
+            }
+          });
+          setFieldErrors(errors);
+        }
+        
         setMessage({ 
           type: 'error', 
           text: response.error || 'Failed to update profile' 
@@ -235,11 +243,12 @@ const ProfilePage: React.FC = () => {
                 <input
                   type="email"
                   name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  required
+                  value={user?.email ?? ''}
+                  readOnly
+                  aria-readonly="true"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
                 />
+                <p className="text-xs text-gray-500 mt-1">Email is managed separately.</p>
               </div>
 
               <div>
@@ -248,12 +257,21 @@ const ProfilePage: React.FC = () => {
                 </label>
                 <textarea
                   name="bio"
-                  value={formData.bio}
+                  value={formData.bio ?? ''}
                   onChange={handleInputChange}
                   rows={3}
+                  maxLength={500}
                   placeholder="Tell others about yourself..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
+                <div className="text-sm text-gray-500 mt-1">
+                  {(formData.bio ?? '').length}/500 characters
+                </div>
+                {fieldErrors.bio && (
+                  <div className="text-sm text-red-600 mt-1">
+                    {fieldErrors.bio}
+                  </div>
+                )}
               </div>
 
               <div className="flex space-x-3">
