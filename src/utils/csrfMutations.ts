@@ -373,3 +373,226 @@ export async function updateBasicInfoWithCsrf(profileData: any): Promise<Mutatio
   return mutateWithCsrf('PUT', '/api/profile/basic-info', profileData);
 }
 
+
+/**
+ * Lake Reflex Helper Types
+ */
+export interface LakeReflexOptions {
+  queryKeys: string[];
+  onSuccess?: () => void;
+  onError?: (error: string, code?: string) => void;
+}
+
+export interface LakeReflexResponse<T = any> {
+  ok: boolean;
+  data?: T;
+  error?: string;
+  code?: string;
+}
+
+/**
+ * Shared lake reflex helper: mutate → cancel stale reads → refetch → success UI
+ * Enforces "write → invalidate → refetch → render" pattern with no mutation body parsing
+ * 
+ * @param method HTTP method (POST, PUT, PATCH, DELETE)
+ * @param path API path (relative, e.g., '/api/profile/basic-info')
+ * @param body Request body
+ * @param options Lake reflex options with query keys and callbacks
+ * @returns Promise with response metadata (no body parsing on success)
+ */
+export async function mutateWithLakeReflex<T = any>(
+  method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  path: string,
+  body: any,
+  options: LakeReflexOptions,
+  queryClient: any // QueryClient instance
+): Promise<LakeReflexResponse<T>> {
+  const { queryKeys, onSuccess, onError } = options;
+  const startTime = Date.now();
+  
+  try {
+    // Cancel any stale reads before mutation
+    await queryClient.cancelQueries({ queryKey: queryKeys });
+    
+    // Read CSRF token from cookie at call-time
+    let csrfToken = getCsrfTokenFromCookie();
+    
+    emitAuthBreadcrumb('auth.login.submit', { 
+      route: path
+    });
+
+    // Runtime-gated request logging (keys-only)
+    if (debugKeysOnly()) {
+      console.info('bd_req_keys', { route: path, keys: Object.keys(body || {}) });
+    }
+
+    // Prepare headers
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    // Add CSRF token if available
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
+
+    // Prepare request options
+    const requestOptions: RequestInit = {
+      method,
+      credentials: 'include',
+      headers,
+      body: JSON.stringify(body)
+    };
+
+    // First attempt
+    let response = await fetch(path, requestOptions);
+    
+    // Check for CSRF error on first attempt (status-based detection only)
+    if (response.status === 403) {
+      // CSRF telemetry: auto-recovery start
+      if (shouldSampleCsrfTelemetry()) {
+        console.info('bd_csrf_auto_recover_start', { retry: 1 });
+      }
+      
+      // Runtime-gated debug breadcrumb (keys-only)
+      if (debugKeysOnly()) {
+        console.info('bd_csrf_auto_recover start');
+      }
+
+      emitAuthBreadcrumb('auth.handshake.me_invalidate', { 
+        route: path,
+        error_code: 'CSRF_403'
+      });
+
+      // Attempt to refresh CSRF token (exactly one retry)
+      const newToken = await refreshCsrfToken();
+      
+      if (newToken) {
+        // Update headers with new token
+        headers['X-CSRF-Token'] = newToken;
+        requestOptions.headers = headers;
+
+        // Retry the original request (exactly once)
+        response = await fetch(path, requestOptions);
+
+        if (response.ok) {
+          // CSRF telemetry: auto-recovery success
+          if (shouldSampleCsrfTelemetry()) {
+            console.info('bd_csrf_auto_recover_success', { retry: 1 });
+          }
+          
+          // Runtime-gated debug breadcrumb (keys-only)
+          if (debugKeysOnly()) {
+            console.info('bd_csrf_auto_recover success');
+          }
+
+          emitAuthBreadcrumb('auth.login.success', { 
+            route: path,
+            latency_ms: Date.now() - startTime
+          });
+        } else {
+          // CSRF telemetry: auto-recovery fail
+          if (shouldSampleCsrfTelemetry()) {
+            console.info('bd_csrf_auto_recover_fail', { retry: 1 });
+          }
+          
+          // Runtime-gated debug breadcrumb (keys-only)
+          if (debugKeysOnly()) {
+            console.info(`bd_csrf_auto_recover fail status=${response.status}`);
+          }
+
+          emitAuthBreadcrumb('auth.login.break_glass.reload', { 
+            route: path,
+            http_status: response.status
+          });
+        }
+      } else {
+        // CSRF telemetry: auto-recovery fail (token refresh failed)
+        if (shouldSampleCsrfTelemetry()) {
+          console.info('bd_csrf_auto_recover_fail', { retry: 0 });
+        }
+        
+        // Runtime-gated debug breadcrumb (keys-only)
+        if (debugKeysOnly()) {
+          console.info('bd_csrf_auto_recover fail code=csrf_refresh_failed');
+        }
+
+        emitAuthBreadcrumb('auth.login.break_glass.reload', { 
+          route: path,
+          error_code: 'csrf_refresh_failed'
+        });
+      }
+    }
+
+    // Lake reflex success gate: response.ok only (200/201/204)
+    if (response.ok) {
+      emitAuthBreadcrumb('auth.login.success', { 
+        route: path,
+        latency_ms: Date.now() - startTime
+      });
+
+      // Runtime-gated response metadata (keys-only)
+      if (debugKeysOnly()) {
+        console.info('bd_resp_meta', { 
+          route: path, 
+          ok: response.ok, 
+          status: response.status
+        });
+      }
+
+      // Lake reflex: refetch specified query keys (exactly one GET)
+      await queryClient.refetchQueries({ 
+        queryKey: queryKeys, 
+        exact: true,
+        type: 'active'
+      });
+
+      // Success UI fires AFTER refetch completes
+      if (onSuccess) {
+        onSuccess();
+      }
+
+      return {
+        ok: true,
+        data: undefined // Never parse mutation body on success
+      };
+
+    } else {
+      // Error path: no refetch, surface typed error
+      emitAuthBreadcrumb('auth.login.break_glass.reload', { 
+        route: path,
+        http_status: response.status
+      });
+
+      const errorMessage = `Failed to update (HTTP ${response.status})`;
+      
+      if (onError) {
+        onError(errorMessage, `HTTP_${response.status}`);
+      }
+
+      return {
+        ok: false,
+        error: errorMessage,
+        code: `HTTP_${response.status}`
+      };
+    }
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Network error';
+    
+    emitAuthBreadcrumb('auth.login.break_glass.reload', { 
+      route: path,
+      error_code: errorMessage
+    });
+
+    if (onError) {
+      onError(errorMessage, 'NETWORK_ERROR');
+    }
+
+    return {
+      ok: false,
+      error: errorMessage,
+      code: 'NETWORK_ERROR'
+    };
+  }
+}

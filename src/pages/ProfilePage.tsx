@@ -6,7 +6,7 @@ import { useCurrentUser } from '../queries/auth/authQueries';
 import Magic10SimpleDisplay from '../components/Magic10SimpleDisplay';
 import BirthDataFormCanonical from '../components/BirthDataFormCanonical';
 import apiClient from '../core/api';
-import { getCsrfTokenFromCookie } from '../utils/csrfMutations';
+import { getCsrfTokenFromCookie, mutateWithLakeReflex } from '../utils/csrfMutations';
 import { useQueryClient } from '@tanstack/react-query';
 import { safeFormatBirthDate, safeFormatBirthTime } from '../utils/dateTime';
 
@@ -64,6 +64,8 @@ const ProfilePage: React.FC = () => {
   };
 
   const handleBasicInfoSave = async () => {
+    if (loading) return; // Concurrency guard
+    
     setLoading(true);
     setMessage(null);
 
@@ -75,40 +77,36 @@ const ProfilePage: React.FC = () => {
         bio: formData.bio ?? ''
       };
 
-      // SW-G5: Direct fetch to avoid body parsing, gate on response.ok only
-      const response = await fetch('/api/profile/basic-info', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': getCsrfTokenFromCookie() || ''
+      // LB-2: Use shared lake reflex helper (mutate → refetch → success UI)
+      await mutateWithLakeReflex(
+        'PUT',
+        '/api/profile/basic-info',
+        basicInfoPayload,
+        {
+          queryKeys: ['auth', 'me'],
+          onSuccess: () => {
+            // Success UI fires AFTER refetch completes
+            setMessage({ type: 'success', text: 'Profile updated successfully!' });
+            setEditingSection(null);
+            setFieldErrors({}); // Clear any previous field errors
+          },
+          onError: (error, code) => {
+            // Error path: no refetch, surface typed error
+            setMessage({ 
+              type: 'error', 
+              text: error
+            });
+          }
         },
-        credentials: 'include',
-        body: JSON.stringify(basicInfoPayload)
-      });
-      
-      if (response.ok) {
-        // SW-G5: Success on any 2xx (204/200), no body parsing
-        setMessage({ type: 'success', text: 'Profile updated successfully!' });
-        setEditingSection(null);
-        setFieldErrors({}); // Clear any previous field errors
-        
-        // Invalidate and refetch /api/auth/me (round-trip guarantee)
-        await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
-        await queryClient.refetchQueries({ queryKey: ['auth', 'me'] });
-      } else {
-        // SW-G5: Error path - no cache invalidation, show error
-        setMessage({ 
-          type: 'error', 
-          text: `Failed to update profile (HTTP ${response.status})` 
-        });
-      }
+        queryClient
+      );
     } catch (error) {
       setMessage({ 
         type: 'error', 
         text: 'Failed to update profile. Please try again.' 
       });
     } finally {
-      setLoading(false);
+      setLoading(false); // Reset concurrency guard in finally block
     }
   };
 
