@@ -19,7 +19,6 @@ interface BirthDataFormCanonicalProps {
 interface BirthDataFormData {
   date: string;      // YYYY-MM-DD (ISO format)
   time: string;      // HH:MM (24h format, no seconds)
-  timezone: string;  // IANA timezone
   location: string;  // Free text location (REQUIRED for HD)
   latitude: number | null;   // Geocoded latitude (required for HD)
   longitude: number | null;  // Geocoded longitude (required for HD)
@@ -38,7 +37,6 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
   const [formData, setFormData] = useState<BirthDataFormData>({
     date: '',
     time: '',
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Default to user's timezone
     location: '',
     latitude: null,
     longitude: null
@@ -59,7 +57,6 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
       setFormData({
         date: birthData.date || '',
         time: birthData.time || '',
-        timezone: birthData.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
         location: birthData.location || '',
         latitude: birthData.latitude || null,
         longitude: birthData.longitude || null
@@ -67,95 +64,6 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
     }
   }, [currentUser]);
 
-  // Get comprehensive IANA timezone list
-  const getTimezoneList = (): string[] => {
-    try {
-      // Modern browsers: use runtime IANA list
-      if ('supportedValuesOf' in Intl) {
-        return (Intl as any).supportedValuesOf('timeZone');
-      }
-    } catch (error) {
-      console.warn('Intl.supportedValuesOf not available, using fallback list');
-    }
-    
-    // Fallback: comprehensive IANA timezone list
-    return [
-      'UTC',
-      'America/New_York',
-      'America/Chicago', 
-      'America/Denver',
-      'America/Los_Angeles',
-      'America/Phoenix',
-      'America/Anchorage',
-      'Pacific/Honolulu',
-      'America/Toronto',
-      'America/Vancouver',
-      'America/Montreal',
-      'America/Halifax',
-      'America/Mexico_City',
-      'America/Sao_Paulo',
-      'America/Buenos_Aires',
-      'America/Lima',
-      'America/Bogota',
-      'America/Caracas',
-      'Europe/London',
-      'Europe/Paris',
-      'Europe/Berlin',
-      'Europe/Rome',
-      'Europe/Madrid',
-      'Europe/Amsterdam',
-      'Europe/Brussels',
-      'Europe/Vienna',
-      'Europe/Zurich',
-      'Europe/Stockholm',
-      'Europe/Oslo',
-      'Europe/Copenhagen',
-      'Europe/Helsinki',
-      'Europe/Warsaw',
-      'Europe/Prague',
-      'Europe/Budapest',
-      'Europe/Bucharest',
-      'Europe/Athens',
-      'Europe/Istanbul',
-      'Europe/Moscow',
-      'Europe/Kiev',
-      'Asia/Tokyo',
-      'Asia/Seoul',
-      'Asia/Shanghai',
-      'Asia/Hong_Kong',
-      'Asia/Singapore',
-      'Asia/Bangkok',
-      'Asia/Jakarta',
-      'Asia/Manila',
-      'Asia/Kuala_Lumpur',
-      'Asia/Taipei',
-      'Asia/Mumbai',
-      'Asia/Kolkata',
-      'Asia/Delhi',
-      'Asia/Karachi',
-      'Asia/Dhaka',
-      'Asia/Dubai',
-      'Asia/Riyadh',
-      'Asia/Tehran',
-      'Asia/Baghdad',
-      'Asia/Jerusalem',
-      'Africa/Cairo',
-      'Africa/Lagos',
-      'Africa/Nairobi',
-      'Africa/Johannesburg',
-      'Africa/Casablanca',
-      'Australia/Sydney',
-      'Australia/Melbourne',
-      'Australia/Brisbane',
-      'Australia/Perth',
-      'Australia/Adelaide',
-      'Pacific/Auckland',
-      'Pacific/Fiji',
-      'Pacific/Tahiti'
-    ];
-  };
-
-  const timezoneList = getTimezoneList();
 
   // Location search with debouncing (OpenStreetMap geocoding)
   useEffect(() => {
@@ -208,11 +116,6 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
       newErrors.time = 'Time must be in HH:MM format';
     }
 
-    // Validate timezone (required IANA)
-    if (!formData.timezone) {
-      newErrors.timezone = 'Timezone is required';
-    }
-
     // Location validation (REQUIRED for Human Design)
     if (!formData.location.trim()) {
       newErrors.location = 'Birth location is required for Human Design calculations';
@@ -240,7 +143,6 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
       emitAuthBreadcrumb('ui.birth.save.click', {
         has_date: !!formData.date,
         has_time: !!formData.time,
-        has_timezone: !!formData.timezone,
         has_location: !!formData.location
       });
 
@@ -253,7 +155,6 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
 
       emitAuthBreadcrumb('api.birth.put.request', {
         has_csrf: true,
-        tz: formData.timezone,
         has_geocode: false
       });
 
@@ -385,29 +286,6 @@ const BirthDataFormCanonical: React.FC<BirthDataFormCanonicalProps> = ({
           <p className="text-gray-500 text-xs mt-1">
             Enter as precisely as possible for accurate calculations
           </p>
-        </div>
-
-        {/* Timezone */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Timezone <span className="text-red-500">*</span>
-          </label>
-          <select
-            value={formData.timezone}
-            onChange={(e) => setFormData(prev => ({ ...prev, timezone: e.target.value }))}
-            className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 ${
-              errors.timezone ? 'border-red-500' : 'border-gray-300'
-            }`}
-            disabled={isSubmitting}
-          >
-            <option value="">Select timezone...</option>
-            {timezoneList.map(tz => (
-              <option key={tz} value={tz}>
-                {tz.replace(/_/g, ' ')} {/* Make timezone names more readable */}
-              </option>
-            ))}
-          </select>
-          {errors.timezone && <p className="text-red-500 text-xs mt-1">{errors.timezone}</p>}
         </div>
 
         {/* Birth Location */}
