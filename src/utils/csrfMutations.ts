@@ -43,7 +43,7 @@ interface CSRFError {
 /**
  * Read CSRF token from cookie at call-time (no React context dependency)
  */
-function getCsrfTokenFromCookie(): string | null {
+export function getCsrfTokenFromCookie(): string | null {
   const cookies = document.cookie.split(';');
   for (const cookie of cookies) {
     const [name, value] = cookie.trim().split('=');
