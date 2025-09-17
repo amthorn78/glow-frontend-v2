@@ -190,33 +190,18 @@ export async function mutateWithCsrf<T = any>(
     
     let data;
     
-    // SW-G4: Handle 204 No Content without parsing, ensure single body read
-    if (response.status === 204) {
-      // 204 No Content - success with no body to parse
-      data = { ok: true };
-    } else {
-      // For responses with potential body content
-      try {
-        data = await response.json();
-      } catch (jsonError) {
-        // Single fallback read for non-JSON responses (e.g., proxy 400s)
-        try {
-          const bodyText = await response.text();
-          data = {
-            code: 'HTTP_ERROR',
-            error: `HTTP ${response.status}`,
-            status: response.status,
-            bodyText: bodyText
-          };
-        } catch (textError) {
-          // If both JSON and text fail, create minimal error object
-          data = {
-            code: 'PARSE_ERROR',
-            error: `HTTP ${response.status}`,
-            status: response.status
-          };
-        }
-      }
+    // HF-BIO-001C: Safely parse JSON, handle plain text responses
+    try {
+      data = await response.json();
+    } catch (jsonError) {
+      // Handle plain text responses (e.g., proxy 400s)
+      const bodyText = await response.text();
+      data = {
+        code: 'HTTP_ERROR',
+        error: `HTTP ${response.status}`,
+        status: response.status,
+        bodyText: bodyText
+      };
     }
 
     // Check for CSRF error on first attempt
@@ -247,33 +232,17 @@ export async function mutateWithCsrf<T = any>(
         // Retry the original request
         response = await fetch(path, requestOptions);
         
-        // SW-G4: Handle 204 No Content on retry, ensure single body read
-        if (response.status === 204) {
-          // 204 No Content - success with no body to parse
-          data = { ok: true };
-        } else {
-          // For responses with potential body content
-          try {
-            data = await response.json();
-          } catch (jsonError) {
-            // Single fallback read for non-JSON responses
-            try {
-              const bodyText = await response.text();
-              data = {
-                code: 'HTTP_ERROR',
-                error: `HTTP ${response.status}`,
-                status: response.status,
-                bodyText: bodyText
-              };
-            } catch (textError) {
-              // If both JSON and text fail, create minimal error object
-              data = {
-                code: 'PARSE_ERROR',
-                error: `HTTP ${response.status}`,
-                status: response.status
-              };
-            }
-          }
+        // HF-BIO-001C: Safely parse JSON on retry as well
+        try {
+          data = await response.json();
+        } catch (jsonError) {
+          const bodyText = await response.text();
+          data = {
+            code: 'HTTP_ERROR',
+            error: `HTTP ${response.status}`,
+            status: response.status,
+            bodyText: bodyText
+          };
         }
 
         if (response.ok) {
