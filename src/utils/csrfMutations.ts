@@ -526,6 +526,9 @@ export async function mutateWithLakeReflex<T = any>(
 
     // Lake reflex success gate: response.ok only (200/201/204)
     if (response.ok) {
+      const correlationId = generateCorrelationId();
+      const refetchStartTime = Date.now();
+
       emitAuthBreadcrumb('auth.login.success', { 
         route: path,
         latency_ms: Date.now() - startTime
@@ -545,6 +548,18 @@ export async function mutateWithLakeReflex<T = any>(
         queryKey: queryKeys, 
         exact: true,
         type: 'active'
+      });
+
+      // LB-5a: Emit latency metric AFTER refetch completes
+      const latencyMs = Date.now() - refetchStartTime;
+      emitLakeMetric({
+        correlation_id: correlationId,
+        route: path, // Coarse, static path (e.g., '/api/profile/basic-info')
+        method: method,
+        status: response.status,
+        latency_ms: latencyMs,
+        sampled: true,
+        ts_iso: new Date().toISOString()
       });
 
       // Success UI fires AFTER refetch completes
@@ -594,5 +609,82 @@ export async function mutateWithLakeReflex<T = any>(
       error: errorMessage,
       code: 'NETWORK_ERROR'
     };
+  }
+}
+
+/**
+ * LB-5a: Lake Metrics Types and Functions
+ */
+import { getMetricsConfig } from '../config/metrics';
+
+interface LakeMetricsEvent {
+  correlation_id: string;
+  route: string;
+  method: string;
+  status: number;
+  latency_ms: number;
+  sampled: boolean;
+  ts_iso: string;
+}
+
+/**
+ * Generate correlation ID using crypto.randomUUID with fallback
+ */
+function generateCorrelationId(): string {
+  // Browser guard + prefer crypto.randomUUID
+  if (typeof window !== 'undefined' && typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  
+  // Fallback UUID v4 implementation
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+/**
+ * Emit lake reflex latency metric (PII-free, fire-and-forget)
+ */
+function emitLakeMetric(event: LakeMetricsEvent): void {
+  // Browser guard for SSR/Node compatibility
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+    return;
+  }
+
+  const config = getMetricsConfig();
+  
+  // No-op if no URL or not sampled
+  if (!config.METRICS_URL || Math.random() > config.LAKE_METRICS_SAMPLE_RATE) {
+    return;
+  }
+
+  try {
+    const payload = JSON.stringify(event);
+    
+    // Primary: navigator.sendBeacon (text/plain default)
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(config.METRICS_URL, payload);
+    } else {
+      // Fallback: fetch with keepalive (text/plain)
+      fetch(config.METRICS_URL, {
+        method: 'POST',
+        body: payload,
+        headers: { 'Content-Type': 'text/plain' },
+        keepalive: true
+      }).catch(() => {}); // Swallow errors
+    }
+    
+    // Debug logging only when explicitly enabled
+    if (config.LAKE_METRICS_DEBUG) {
+      console.info('lake_metric_emitted', { 
+        correlation_id: event.correlation_id,
+        route: event.route,
+        latency_ms: event.latency_ms
+      });
+    }
+  } catch (error) {
+    // Never throw; swallow all emission errors
   }
 }
