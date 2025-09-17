@@ -8,6 +8,7 @@ import BirthDataFormCanonical from '../components/BirthDataFormCanonical';
 import apiClient from '../core/api';
 import { updateBasicInfoWithCsrf } from '../utils/csrfMutations';
 import { useQueryClient } from '@tanstack/react-query';
+import { safeFormatBirthDate, safeFormatBirthTime } from '../utils/dateTime';
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
@@ -360,11 +361,11 @@ const ProfilePage: React.FC = () => {
                 <>
                   <div>
                     <span className="text-sm text-gray-500">Birth Date</span>
-                    <p className="font-medium">{birthData.date}</p>
+                    <p className="font-medium">{safeFormatBirthDate(birthData.date)}</p>
                   </div>
                   <div>
                     <span className="text-sm text-gray-500">Birth Time</span>
-                    <p className="font-medium">{birthData.time || 'Not set'}</p>
+                    <p className="font-medium">{safeFormatBirthTime(birthData.time)}</p>
                   </div>
                   <div>
                     <span className="text-sm text-gray-500">Birth Location</span>
