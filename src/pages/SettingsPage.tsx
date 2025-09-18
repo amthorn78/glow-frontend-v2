@@ -15,13 +15,29 @@ const SettingsPage: React.FC = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-  // FE-01a: Single read surface - get current pace from auth/me only
+  // FE-HIDE-01: Feature flag to hide preferences (default OFF)
+  const showPreferences = process.env.NEXT_PUBLIC_SHOW_PREFERENCES === '1';
+  
+  // FE-02: Single read surface - get current pace from auth/me only
   const pace = authResult?.user?.preferences?.preferred_pace ?? "medium";
   const paceOptions = ["slow","medium","fast"] as const;
 
-  // FE-01a: Lake-compliant pace change handler
-  const handlePaceChange = async (newPace: string) => {
-    if (newPace === pace || isUpdating) return;
+  // FE-02: Draft state for immediate UI updates
+  const [draftPace, setDraftPace] = useState(pace ?? "medium");
+
+  // FE-02: Sync draft with server state
+  React.useEffect(() => {
+    setDraftPace(pace ?? "medium");
+  }, [pace]);
+
+  // FE-02: Dirty detection
+  const dirty = draftPace !== pace;
+
+  // FE-02: Lake-compliant save handler with no-op guard
+  const handleSave = async () => {
+    // FE-HIDE-01: Early return if preferences hidden
+    if (!showPreferences || !dirty || isUpdating) return;
+    
     setIsUpdating(true);
     setMessage(null);
     
@@ -29,14 +45,20 @@ const SettingsPage: React.FC = () => {
       await mutateWithLakeReflex({ 
         url: "/api/profile/preferences", 
         method: "PUT", 
-        body: { preferred_pace: newPace } 
+        body: { preferred_pace: draftPace } 
       }, {
         queryKeys: ['auth', 'me'],
         onSuccess: () => {
           // No optimistic updates - success UI fires AFTER refetch completes
           setMessage({ type: 'success', text: 'Preference saved.' });
         },
-        onError: (error: string) => setMessage({ type: 'error', text: error })
+        onError: (error: string) => {
+          // Typed error handling for session expiry
+          const errorMessage = error.includes('403') || error.includes('Session') 
+            ? 'Session expired—please refresh.'
+            : error;
+          setMessage({ type: 'error', text: errorMessage });
+        }
       }, queryClient);
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to save preference. Please try again.' });
@@ -88,19 +110,42 @@ const SettingsPage: React.FC = () => {
             <p className="text-sm text-gray-600">Notification preferences will be available here.</p>
           </div>
 
-          {/* FE-01: Preferences Section with FormEnumSelect */}
-          <div className="border-b border-gray-200 pb-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Preferences</h2>
-            <FormEnumSelect
-              label="Preferred pace"
-              value={pace}
-              options={paceOptions}
-              onChange={handlePaceChange}
-              disabled={isUpdating}
-              helpText="Choose how quickly we move you through questions."
-              name="preferred_pace"
-            />
-          </div>
+          {/* FE-HIDE-01: Preferences Section (hidden by default) */}
+          {showPreferences && (
+            <div className="border-b border-gray-200 pb-6">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">Preferences</h2>
+              <FormEnumSelect
+                label="Preferred pace"
+                value={draftPace}
+                options={paceOptions}
+                onChange={setDraftPace}
+                disabled={isUpdating}
+                helpText="Choose how quickly we move you through questions."
+                name="preferred_pace"
+              />
+              
+              {/* FE-02: Save button with dirty guard */}
+              <div className="mt-4 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={!dirty || isUpdating}
+                  className={`
+                    px-4 py-2 rounded-md text-sm font-medium transition-colors
+                    ${dirty && !isUpdating 
+                      ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }
+                  `.trim()}
+                >
+                  {isUpdating ? 'Saving...' : 'Save'}
+                </button>
+                {dirty && (
+                  <span className="text-sm text-gray-500">Unsaved changes</span>
+                )}
+              </div>
+            </div>
+          )}
 
           <div>
             <h2 className="text-lg font-medium text-gray-900 mb-4">Support</h2>
