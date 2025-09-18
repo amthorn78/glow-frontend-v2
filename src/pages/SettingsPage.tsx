@@ -15,17 +15,22 @@ const SettingsPage: React.FC = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-  // D2c-SET-hotfix: Single read surface - get current pace from auth/me only
-  const currentPace = authResult?.user?.preferences?.preferred_pace || 'medium';
+  // FE-01a: Single read surface - get current pace from auth/me only
+  const pace = authResult?.user?.preferences?.preferred_pace ?? "medium";
+  const paceOptions = ["slow","medium","fast"] as const;
 
-  // D2c-SET-hotfix: Lake-compliant pace change handler
+  // FE-01a: Lake-compliant pace change handler
   const handlePaceChange = async (newPace: string) => {
-    if (newPace === currentPace || isUpdating) return;
+    if (newPace === pace || isUpdating) return;
     setIsUpdating(true);
     setMessage(null);
     
     try {
-      await mutateWithLakeReflex('PUT', '/api/profile/preferences', { preferred_pace: newPace }, {
+      await mutateWithLakeReflex({ 
+        url: "/api/profile/preferences", 
+        method: "PUT", 
+        body: { preferred_pace: newPace } 
+      }, {
         queryKeys: ['auth', 'me'],
         onSuccess: () => {
           // No optimistic updates - success UI fires AFTER refetch completes
@@ -88,8 +93,8 @@ const SettingsPage: React.FC = () => {
             <h2 className="text-lg font-medium text-gray-900 mb-4">Preferences</h2>
             <FormEnumSelect
               label="Preferred pace"
-              value={currentPace}
-              options={['slow', 'medium', 'fast']}
+              value={pace}
+              options={paceOptions}
               onChange={handlePaceChange}
               disabled={isUpdating}
               helpText="Choose how quickly we move you through questions."
