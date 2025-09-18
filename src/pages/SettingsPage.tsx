@@ -1,27 +1,23 @@
 // Settings Page - T-UI-001 Settings Route Fix
 // Simple settings page with GlobalMenu integration
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
+import { useCurrentUser } from '../queries/auth/authQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { mutateWithLakeReflex } from '../utils/csrfMutations';
-import apiClient from '../core/api';
 
 const SettingsPage: React.FC = () => {
   const { user } = useAuthStore();
+  const { data: authResult } = useCurrentUser(); // Single read surface
   const queryClient = useQueryClient();
-  const [currentPace, setCurrentPace] = useState<string>('medium');
   const [isUpdating, setIsUpdating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-  // S8-D2c: Load preferences on mount
-  useEffect(() => {
-    apiClient.get('/api/profile/preferences')
-      .then(response => response.data?.preferred_pace && setCurrentPace(response.data.preferred_pace))
-      .catch(() => {}); // Default to 'medium'
-  }, []);
+  // D2c-SET-hotfix: Single read surface - get current pace from auth/me only
+  const currentPace = authResult?.user?.preferences?.preferred_pace || 'medium';
 
-  // S8-D2c: Handle pace change
+  // D2c-SET-hotfix: Lake-compliant pace change handler
   const handlePaceChange = async (newPace: string) => {
     if (newPace === currentPace || isUpdating) return;
     setIsUpdating(true);
@@ -31,7 +27,7 @@ const SettingsPage: React.FC = () => {
       await mutateWithLakeReflex('PUT', '/api/profile/preferences', { preferred_pace: newPace }, {
         queryKeys: ['auth', 'me'],
         onSuccess: () => {
-          setCurrentPace(newPace);
+          // No optimistic updates - success UI fires AFTER refetch completes
           setMessage({ type: 'success', text: 'Preference saved.' });
         },
         onError: (error: string) => setMessage({ type: 'error', text: error })
