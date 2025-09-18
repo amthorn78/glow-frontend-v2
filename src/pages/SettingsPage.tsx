@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useCurrentUser } from '../queries/auth/authQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { mutateWithLakeReflex } from '../utils/csrfMutations';
+import { FormEnumSelect } from '../components/FormEnumSelect';
 
 const SettingsPage: React.FC = () => {
   const { user } = useAuthStore();
@@ -82,27 +83,18 @@ const SettingsPage: React.FC = () => {
             <p className="text-sm text-gray-600">Notification preferences will be available here.</p>
           </div>
 
-          {/* S8-D2c: Preferences Section */}
+          {/* FE-01: Preferences Section with FormEnumSelect */}
           <div className="border-b border-gray-200 pb-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Preferences</h2>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Preferred pace</label>
-              <p className="text-sm text-gray-500 mb-3">Choose how quickly we move you through questions.</p>
-              <div className="flex bg-gray-100 rounded-lg p-1 max-w-md">
-                {['slow', 'medium', 'fast'].map((pace) => (
-                  <button
-                    key={pace}
-                    onClick={() => handlePaceChange(pace)}
-                    disabled={isUpdating}
-                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                      currentPace === pace ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-                    } ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    {pace.charAt(0).toUpperCase() + pace.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <FormEnumSelect
+              label="Preferred pace"
+              value={currentPace}
+              options={['slow', 'medium', 'fast']}
+              onChange={handlePaceChange}
+              disabled={isUpdating}
+              helpText="Choose how quickly we move you through questions."
+              name="preferred_pace"
+            />
           </div>
 
           <div>
