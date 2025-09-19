@@ -1,6 +1,7 @@
 // Auth Queries - Auth v2 Cookie-based
 // Phase 2: DISSOLUTION - Server State Management
 
+import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys, invalidateQueries, getQueryClient } from '../../providers/QueryProvider';
 import { useAuthStore } from '../../stores/authStore';
@@ -31,55 +32,27 @@ export const authQueryKeys = {
 export const useCurrentUser = () => {
   const authStore = useAuthStore();
 
+  // FE-2: Cleanup on unmount to abort in-flight requests
+  React.useEffect(() => {
+    return () => {
+      import('../../lib/authMeClient').then(({ authMeClient }) => {
+        authMeClient.abort();
+      });
+    };
+  }, []);
+
   return useQuery({
     queryKey: authQueryKeys.me,
     queryFn: async () => {
-      const traceId = Math.random().toString(36).substr(2, 8);
-      const traceEnabled = import.meta.env.VITE_TRACE_AUTH === '1' || true; // Force enable for debugging
-      
-      if (traceEnabled) {
-        console.log(`[BOOTSTRAP-${traceId}] START: /api/auth/me probe starting...`);
-      }
-      
-      try {
-        const response = await apiClient.getCurrentUser();
-        
-        if (traceEnabled) {
-          console.log(`[BOOTSTRAP-${traceId}] RESPONSE: /api/auth/me`, {
-            status: response.status,
-            auth: response.data.auth,
-            hasUser: !!response.data.user
-          });
-        }
-        
-        // Always resolves - never throws
-        if (response.data.auth === 'authenticated' && response.data.user) {
-          if (traceEnabled) {
-            console.log(`[BOOTSTRAP-${traceId}] END: Branch authenticated`);
-          }
-          
-          // F3: Do not write directly to store - let AuthProvider handle it
-          return { auth: 'authenticated', user: response.data.user };
-        } else {
-          if (traceEnabled) {
-            console.log(`[BOOTSTRAP-${traceId}] END: Branch unauthenticated`);
-          }
-          
-          // F3: Do not write directly to store - let AuthProvider handle it
-          return { auth: 'unauthenticated', user: null };
-        }
-      } catch (error) {
-        if (traceEnabled) {
-          console.log(`[BOOTSTRAP-${traceId}] ERROR: /api/auth/me error:`, error);
-        }
-        
-        // F3: Do not write directly to store - let AuthProvider handle it
-        return { auth: 'unauthenticated', user: null };
-      }
+      // FE-2: Use hardened authMeClient with coalescing and cancellation
+      const { authMeClient } = await import('../../lib/authMeClient');
+      return authMeClient.fetchAuthMe();
     },
-    retry: false, // Single-shot: never retry, first result is terminal
-    refetchOnWindowFocus: false, // Prevent background churn
-    staleTime: 60 * 1000, // 60 seconds
+    // FE-2: Strict lake defaults for ['auth','me']
+    staleTime: 0,
+    retry: 0,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     gcTime: 5 * 60 * 1000, // 5 minutes
     refetchOnMount: true,
   });

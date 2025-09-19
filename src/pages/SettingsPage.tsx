@@ -8,7 +8,7 @@ import { FormEnumSelect } from '../components/FormEnumSelect';
 import { mutateWithLakeReflex } from '../utils/csrfMutations';
 import { queryKeys } from '../providers/QueryProvider';
 import { FLAGS } from '../lib/flags';
-import mapping from '../contracts/registry/mapping.json';
+import mapping from '../contracts/registry/mapping';
 
 // Local enum options for preferred_pace
 const PACE_OPTIONS = ["slow", "medium", "fast"] as const;
