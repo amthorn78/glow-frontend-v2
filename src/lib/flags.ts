@@ -1,8 +1,5 @@
-// Build-time flags. Change in Vercel → redeploy.
-
-const on = (v?: string) => v === '1' || v === 'true';
-
+// src/lib/flags.ts
 export const FLAGS = {
-  PACE_WRITE: on(import.meta.env.VITE_ENABLE_PREFERRED_PACE_WRITE),
-  DEBUG_FLAGS: on(import.meta.env.VITE_DEBUG_FLAGS),
+  PACE_WRITE: import.meta.env.VITE_ENABLE_PREFERRED_PACE_WRITE === '1',
+  DEBUG_FLAGS: import.meta.env.VITE_DEBUG_FLAGS === '1',
 } as const;

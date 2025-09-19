@@ -10,8 +10,9 @@ import { queryKeys } from '../providers/QueryProvider';
 import { FLAGS } from '../lib/flags';
 import mapping from '../contracts/registry/mapping';
 
-// Local enum options for preferred_pace
-const PACE_OPTIONS = ["slow", "medium", "fast"] as const;
+// Canonical pace enum and options
+const PACE = ['slow', 'medium', 'fast'] as const;
+const PACE_OPTS = PACE.map(v => v.charAt(0).toUpperCase() + v.slice(1));
 
 // Helper to get nested value from object using dot notation
 const getNestedValue = (obj: any, path: string): string | undefined => {
@@ -37,15 +38,20 @@ const SettingsPage: React.FC = () => {
   
 
 
-  const handlePreferredPaceChange = async (newValue: string) => {
+  const handlePreferredPaceChange = async (raw: string) => {
+    const currentValue = getNestedValue(authResult, 'user.preferences.preferred_pace');
+    const canonical = raw.toLowerCase();
+    
+    if (!PACE.includes(canonical as any)) return;
+    if (canonical === (currentValue ?? '').toLowerCase()) return;
+    
     setIsUpdating(true);
     
     try {
-      // Use shared reflex helper: PUT → CSRF retry → refetch ['auth','me']
       await mutateWithLakeReflex(
         'PUT',
         '/api/profile/preferences',
-        { preferred_pace: newValue },
+        { preferred_pace: canonical }, // exact enum
         {
           queryKeys: queryKeys.auth.me,
           onSuccess: () => {
@@ -68,46 +74,54 @@ const SettingsPage: React.FC = () => {
     const value = getNestedValue(authResult, entry.read_path);
     const displayValue = value || undefined; // Let ReadOnlyField handle "Not set"
     
-    // Precise gating: editable only when all conditions met
-    const isPaceEditable = 
-      entry.field === 'preferred_pace' &&
-      entry.writer === 'preferences' &&
-      FLAGS.PACE_WRITE;
-    
-    if (isPaceEditable) {
-      return (
-        <div key={entry.field} className="py-4 border-b border-gray-200 last:border-b-0">
-          <div className="flex items-center">
-            <FormEnumSelect
-              label={getFieldLabel(entry.field)}
-              value={value || 'medium'}
-              options={[...PACE_OPTIONS]}
-              onChange={handlePreferredPaceChange}
-              disabled={isUpdating}
+    // Special handling for preferred_pace
+    if (entry.field === 'preferred_pace') {
+      const preferredPace = getNestedValue(authResult, 'user.preferences.preferred_pace');
+      const isEditable = entry.field === 'preferred_pace' && entry.writer === 'preferences' && FLAGS.PACE_WRITE;
+      
+      if (isEditable) {
+        return (
+          <div key={entry.field} className="py-4 border-b border-gray-200 last:border-b-0">
+            <div className="flex items-center">
+              <FormEnumSelect
+                label={getFieldLabel(entry.field)}
+                value={(preferredPace ?? 'medium').charAt(0).toUpperCase() + (preferredPace ?? 'medium').slice(1)}
+                options={PACE_OPTS}
+                onChange={handlePreferredPaceChange}
+                disabled={isUpdating}
+              />
+              {FLAGS.DEBUG_FLAGS && (
+                <span className="ml-2 text-[10px] px-2 py-0.5 rounded bg-gray-200 font-mono">
+                  PACE_WRITE:{FLAGS.PACE_WRITE ? 'true' : 'false'}
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      } else {
+        return (
+          <div key={entry.field} className="flex items-center">
+            <ReadOnlyField 
+              label={getFieldLabel(entry.field)} 
+              value={preferredPace}
             />
             {FLAGS.DEBUG_FLAGS && (
-              <span className="ml-2 text-[10px] px-2 py-0.5 rounded bg-gray-200">
-                PACE_WRITE:{String(FLAGS.PACE_WRITE)}
+              <span className="ml-2 text-[10px] px-2 py-0.5 rounded bg-gray-200 font-mono">
+                PACE_WRITE:{FLAGS.PACE_WRITE ? 'true' : 'false'}
               </span>
             )}
           </div>
-        </div>
-      );
+        );
+      }
     }
     
     // Default to read-only for all other cases
     return (
-      <div key={entry.field} className="flex items-center">
-        <ReadOnlyField 
-          label={getFieldLabel(entry.field)} 
-          value={displayValue}
-        />
-        {entry.field === 'preferred_pace' && FLAGS.DEBUG_FLAGS && (
-          <span className="ml-2 text-[10px] px-2 py-0.5 rounded bg-gray-200">
-            PACE_WRITE:{String(FLAGS.PACE_WRITE)}
-          </span>
-        )}
-      </div>
+      <ReadOnlyField 
+        key={entry.field}
+        label={getFieldLabel(entry.field)} 
+        value={displayValue}
+      />
     );
   };
 
