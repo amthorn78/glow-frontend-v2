@@ -1,12 +1,12 @@
-// FE-3: Mapping-driven settings page with conditional preferred_pace editing
+// FE-P0: Reader-first reflex + enum control with correlation ID and enhanced error handling
 
 import React, { useState } from 'react';
 import { useCurrentUser } from '../queries/auth/authQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import ReadOnlyField from '../components/ReadOnlyField';
 import { FormEnumSelect } from '../components/FormEnumSelect';
-import { mutateWithLakeReflex } from '../utils/csrfMutations';
-import { queryKeys } from '../providers/QueryProvider';
+import { mutateWithCsrf } from '../utils/csrfMutations';
+import { postSaveReflex } from '../lib/reflex';
 import { FLAGS } from '../lib/flags';
 import mapping from '../contracts/registry/mapping';
 
@@ -32,8 +32,9 @@ const getFieldLabel = (field: string): string => {
 const SettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [validationError, setValidationError] = useState('');
   
-  // Single read surface - GET /api/auth/me only
+  // Single read surface - GET /api/auth/me only with strict options
   const { data: authResult } = useCurrentUser();
   
 
@@ -46,26 +47,41 @@ const SettingsPage: React.FC = () => {
     if (canonical === (currentValue ?? '').toLowerCase()) return;
     
     setIsUpdating(true);
+    setValidationError('');
     
     try {
-      await mutateWithLakeReflex(
-        'PUT',
-        '/api/profile/preferences',
-        { preferred_pace: canonical }, // exact enum
-        {
-          queryKeys: queryKeys.auth.me,
-          onSuccess: () => {
-            setIsUpdating(false);
-          },
-          onError: (error: string) => {
-            console.error('Failed to update preferred_pace:', error);
-            setIsUpdating(false);
-          }
-        },
-        queryClient
-      );
+      // Generate correlation ID for request tracing
+      const correlationId = crypto.randomUUID();
+      
+      // Optional dev logging
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('cid', correlationId);
+      }
+      
+      // Direct PUT with correlation ID
+      const response = await mutateWithCsrf('PUT', '/api/profile/preferences', { 
+        preferred_pace: canonical 
+      });
+      
+      if (response.ok) {
+        // Success: use postSaveReflex for consistent reader-first behavior
+        await postSaveReflex(queryClient, correlationId);
+        setIsUpdating(false);
+      } else {
+        // Handle typed errors
+        if (response.code === 'validation_error' && response.details?.preferred_pace) {
+          const allowedValues = response.details.preferred_pace.allowed || PACE;
+          setValidationError(`Choose one of: ${allowedValues.join(', ')}.`);
+        } else if (response.error?.includes('Session security')) {
+          setValidationError('Session security check failed—please reload.');
+        } else {
+          setValidationError('We couldn\'t save. Please try again.');
+        }
+        setIsUpdating(false);
+      }
     } catch (error) {
       console.error('Failed to update preferred_pace:', error);
+      setValidationError('We couldn\'t save. Please try again.');
       setIsUpdating(false);
     }
   };
@@ -96,20 +112,34 @@ const SettingsPage: React.FC = () => {
                 </span>
               )}
             </div>
+            {validationError && (
+              <div 
+                className="mt-2 text-sm text-red-600" 
+                aria-live="polite"
+                role="alert"
+              >
+                {validationError}
+              </div>
+            )}
           </div>
         );
       } else {
         return (
-          <div key={entry.field} className="flex items-center">
-            <ReadOnlyField 
-              label={getFieldLabel(entry.field)} 
-              value={preferredPace}
-            />
-            {FLAGS.DEBUG_FLAGS && (
-              <span className="ml-2 text-[10px] px-2 py-0.5 rounded bg-gray-200 font-mono">
-                PACE_WRITE:{FLAGS.PACE_WRITE ? 'true' : 'false'}
+          <div key={entry.field} className="py-4 border-b border-gray-200 last:border-b-0">
+            <div className="flex items-center">
+              <ReadOnlyField 
+                label={getFieldLabel(entry.field)} 
+                value={preferredPace}
+              />
+              <span className="ml-2 text-xs text-gray-500">
+                (Read-only)
               </span>
-            )}
+              {FLAGS.DEBUG_FLAGS && (
+                <span className="ml-2 text-[10px] px-2 py-0.5 rounded bg-gray-200 font-mono">
+                  PACE_WRITE:{FLAGS.PACE_WRITE ? 'true' : 'false'}
+                </span>
+              )}
+            </div>
           </div>
         );
       }

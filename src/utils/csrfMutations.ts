@@ -543,12 +543,9 @@ export async function mutateWithLakeReflex<T = any>(
         });
       }
 
-      // Lake reflex: refetch specified query keys (exactly one GET)
-      await queryClient.refetchQueries({ 
-        queryKey: queryKeys, 
-        exact: true,
-        type: 'active'
-      });
+      // Lake reflex: delegate to postSaveReflex for consistent behavior
+      const { postSaveReflex } = await import('../lib/reflex');
+      await postSaveReflex(queryClient);
 
       // LB-5a: Emit latency metric AFTER refetch completes
       const latencyMs = Date.now() - refetchStartTime;
