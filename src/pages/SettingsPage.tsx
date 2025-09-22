@@ -9,6 +9,7 @@ import { mutateWithCsrf } from '../utils/csrfMutations';
 import { postSaveReflex } from '../lib/reflex';
 import { FLAGS } from '../lib/flags';
 import mapping from '../contracts/registry/mapping';
+import { BandsShell } from '../features/hd/BandsShell';
 
 // Canonical pace enum and options
 const PACE = ['slow', 'medium', 'fast'] as const;
@@ -176,6 +177,13 @@ const SettingsPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* HD Bands Shell - only shown when flag is enabled */}
+        {FLAGS.HD_BANDS && (
+          <div className="mt-8">
+            <BandsShell />
+          </div>
+        )}
       </div>
     </div>
   );

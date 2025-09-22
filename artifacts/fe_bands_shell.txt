@@ -1,0 +1,3 @@
+flag=OFF (default)
+categories count: 10
+top3 list: harmony	heat	balance

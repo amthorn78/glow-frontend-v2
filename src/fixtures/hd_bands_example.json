@@ -1,0 +1,23 @@
+{
+  "categories": [
+    {"id": "alignment", "band": "Open"},
+    {"id": "balance", "band": "Warm"},
+    {"id": "comfort", "band": "Open"},
+    {"id": "communication", "band": "Open"},
+    {"id": "consistency", "band": "Open"},
+    {"id": "creativity", "band": "Open"},
+    {"id": "drive", "band": "Open"},
+    {"id": "expansion", "band": "Open"},
+    {"id": "harmony", "band": "Warm"},
+    {"id": "heat", "band": "Warm"}
+  ],
+  "eligible": true,
+  "engine_tag": "fb_v1+fl_v1+sc_v1@weights_v1+bands_4B60@v1+catalog@v1",
+  "flags": {
+    "out_of_preset": false,
+    "relaxed_pool": false
+  },
+  "prompt": "Easy feel together—sleep on big choices.",
+  "top3_shared": ["harmony", "heat", "balance"],
+  "uncertainty": "low"
+}
