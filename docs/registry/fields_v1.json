@@ -1,0 +1,66 @@
+{
+  "version": "1.0.0",
+  "fields": [
+    {
+      "id": "preferred_pace",
+      "owner": "preferences",
+      "exposure": "user",
+      "status": "active",
+      "writable": true,
+      "read_path": "user.preferences.preferred_pace",
+      "writer": "preferences",
+      "version": "1.0.0",
+      "enum": ["slow", "medium", "fast"]
+    },
+    {
+      "id": "connection_purpose",
+      "owner": "profile",
+      "exposure": "user",
+      "status": "active",
+      "writable": false,
+      "read_path": "user.profile.connection_purpose",
+      "writer": "unavailable",
+      "version": "1.0.0"
+    },
+    {
+      "id": "birth_date",
+      "owner": "profile",
+      "exposure": "user",
+      "status": "active",
+      "writable": true,
+      "read_path": "user.birth_data.date",
+      "writer": "birth_data",
+      "version": "1.0.0"
+    },
+    {
+      "id": "birth_time",
+      "owner": "profile",
+      "exposure": "user",
+      "status": "active",
+      "writable": true,
+      "read_path": "user.birth_data.time",
+      "writer": "birth_data",
+      "version": "1.0.0"
+    },
+    {
+      "id": "birth_location",
+      "owner": "profile",
+      "exposure": "user",
+      "status": "active",
+      "writable": true,
+      "read_path": "user.birth_data.location",
+      "writer": "birth_data",
+      "version": "1.0.0"
+    },
+    {
+      "id": "legacy_field",
+      "owner": "system",
+      "exposure": "internal",
+      "status": "parked",
+      "writable": false,
+      "read_path": "user.legacy.field",
+      "writer": "unavailable",
+      "version": "0.9.0"
+    }
+  ]
+}

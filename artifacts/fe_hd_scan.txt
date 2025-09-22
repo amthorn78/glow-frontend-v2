@@ -1,0 +1,52 @@
+=== FE-AUDIT-HD-01 COMPREHENSIVE SCAN RESULTS ===
+Generated: Sat Sep 20 17:46:11 EDT 2025
+
+1. HUMAN DESIGN CONSTANTS FOUND:
+File: src/core/constants/index.ts
+Lines 51-82: HUMAN_DESIGN constant definitions
+- TYPES: Manifestor, Generator, Manifesting Generator, Projector, Reflector
+- CENTERS: Head, Ajna, Throat, G Center, Heart, Spleen, Solar Plexus, Sacral, Root
+- AUTHORITIES: Emotional, Sacral, Splenic, Ego, Self-Projected, Mental, Lunar
+
+2. MAGIC 10 REFERENCES FOUND:
+Files with Magic10 references:
+src/App.css
+src/App.tsx
+src/components/CompatibilityDisplay.tsx
+src/components/Magic10Display.tsx
+src/components/Magic10DragRanking.tsx
+src/components/Magic10PrioritySlider.tsx
+src/components/Magic10SimpleDisplay.tsx
+src/core/constants/index.ts
+src/core/types/index.ts
+src/pages/ProfilePage.tsx
+src/pages/DashboardPage.tsx
+src/pages/DiscoveryPage.tsx
+src/pages/LandingPage.tsx
+src/pages/Magic10SetupPage.original.tsx
+src/pages/Magic10SetupPage.tsx
+src/queries/magic10/magic10Queries.ts
+src/stores/magic10Store.ts
+
+3. BIRTH DATA HD REFERENCES:
+File: src/components/BirthDataFormCanonical.tsx
+Line 22: // Free text location (REQUIRED for HD)
+Line 23: // Geocoded latitude (required for HD)
+Line 24: // Geocoded longitude (required for HD)
+Line 119: // Location validation (REQUIRED for Human Design)
+Line 121: 'Birth location is required for Human Design calculations'
+Line 124: // Coordinates validation (REQUIRED for Human Design)
+
+🚨 CRITICAL FINDING - HD JARGON EXPOSED IN UI:
+File: src/components/BirthDataFormCanonical.tsx
+Line 121: User-facing error message contains 'Human Design calculations'
+VIOLATION: HD jargon exposed directly to users
+FIRE CLAUSE TRIGGERED: Immediate HOTFIX required
+
+4. SUMMARY:
+- Total files scanned: 114
+- HD constants found: 1 file (src/core/constants/index.ts)
+- Magic10 references: 17 files
+- Critical violations: 1 (HD jargon in user-facing string)
+- Fire Clause triggered: YES
+- Hotfix required: HOTFIX-FE-LEAK-01
